@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Proposta</h2>
+
+<div class="card">
+    <p class="muted">
+        Cliente: <b>{{ proposal.client_name }}</b> •
+        Serviço: <b>{{ proposal.service }}</b> •
+        Prazo: <b>{{ proposal.deadline }}</b> •
+        Valor: <b>{{ proposal.price }}</b>
+    </p>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin:10px 0 14px;">
+        <a href="/proposal/{{ proposal.id }}/pdf"><button type="button">Baixar PDF</button></a>
+        <a href="/history"><button type="button">Voltar ao histórico</button></a>
+        <a href="/create"><button type="button">Criar nova</button></a>
+    </div>
+
+    <h3>Texto (copiar e colar)</h3>
+    <textarea id="proposal_text" rows="18" readonly>{{ proposal.proposal_text }}</textarea>
+
+    <div style="margin-top:10px;">
+        <button type="button" onclick="copyProposal()">Copiar texto</button>
+    </div>
+</div>
+
+<script>
+function copyProposal() {
+  const el = document.getElementById("proposal_text");
+  el.select();
+  el.setSelectionRange(0, 999999);
+  try {
+    document.execCommand("copy");
+    alert("Texto copiado!");
+  } catch (e) {
+    alert("Não consegui copiar automaticamente. Selecione e copie manualmente.");
+  }
+}
+</script>
+{% endblock %}

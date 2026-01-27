@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Proposta Gerada</h2>
+
+<div class="card">
+    <p><strong>Cliente:</strong> {{ proposal.client_name }}</p>
+    <p><strong>Serviço:</strong> {{ proposal.service }}</p>
+    <p><strong>Valor:</strong> {{ proposal.price }}</p>
+    <p><strong>Data:</strong> {{ proposal.created_at.strftime("%d/%m/%Y") if proposal.created_at else "" }}</p>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin:12px 0 6px;">
+        <a href="/proposal/{{ proposal.id }}/pdf"><button type="button">Baixar PDF</button></a>
+        <a href="/history"><button type="button">Ver Histórico</button></a>
+        <a href="/create"><button type="button">Criar Outra</button></a>
+    </div>
+</div>
+
+<div class="card">
+    <h3>Texto da Proposta</h3>
+
+    <textarea id="proposal_text" rows="18" readonly>{{ proposal.proposal_text }}</textarea>
+
+    <p class="muted">Clique no texto acima para selecionar e copiar, ou use o botão.</p>
+
+    <button type="button" onclick="copyProposal()">Copiar texto</button>
+</div>
+
+<script>
+function copyProposal() {
+  const el = document.getElementById("proposal_text");
+  el.select();
+  el.setSelectionRange(0, 999999);
+  try {
+    document.execCommand("copy");
+    alert("Texto copiado!");
+  } catch (e) {
+    alert("Não consegui copiar automaticamente. Selecione e copie manualmente.");
+  }
+}
+</script>
+{% endblock %}

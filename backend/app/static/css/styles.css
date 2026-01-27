@@ -1,0 +1,184 @@
+/* Visual SaaS (Opção 1): azul + cinza, clean e premium */
+
+:root{
+  --max: 980px;
+  --radius: 14px;
+
+  --bg: #f6f8fb;
+  --card: #ffffff;
+  --text: #0f172a;      /* slate-900 */
+  --muted: #475569;     /* slate-600 */
+  --border: #e2e8f0;    /* slate-200 */
+
+  --primary: #2563eb;   /* blue-600 */
+  --primary-dark: #1d4ed8; /* blue-700 */
+  --primary-soft: #eff6ff; /* blue-50 */
+
+  --danger-bg: #fff1f2;
+  --danger-border: #fecdd3;
+  --danger-text: #9f1239;
+}
+
+*{ box-sizing: border-box; }
+
+body{
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.45;
+}
+
+.container{
+  width: 100%;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 18px;
+}
+
+/* Topo */
+.topo{
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.logo{
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+  padding: 14px 0 10px;
+  letter-spacing: -0.2px;
+}
+
+.nav{
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+}
+
+.nav a{
+  text-decoration: none;
+  color: var(--text);
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+}
+
+.nav a:hover{
+  background: var(--primary-soft);
+  border-color: #c7d2fe;
+}
+
+/* Títulos */
+h2{
+  margin: 20px 0 12px;
+  font-size: 22px;
+  letter-spacing: -0.2px;
+}
+
+h3{
+  margin: 18px 0 10px;
+  font-size: 14px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* Card */
+.card{
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin: 14px 0;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+/* Form */
+label{
+  display: block;
+  margin: 10px 0 12px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+}
+
+input, textarea, select{
+  width: 100%;
+  margin-top: 6px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 14px;
+  background: #fff;
+  color: var(--text);
+  outline: none;
+}
+
+input:focus, textarea:focus, select:focus{
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+textarea{ resize: vertical; }
+
+/* Botões */
+button{
+  display: inline-block;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 800;
+  border: 1px solid transparent;
+  background: var(--primary);
+  color: #fff;
+}
+
+button:hover{
+  background: var(--primary-dark);
+}
+
+a button{
+  margin-top: 0;
+}
+
+/* Links gerais */
+a{
+  color: var(--primary);
+}
+
+a:hover{
+  color: var(--primary-dark);
+}
+
+/* Alerts */
+.error{
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-text);
+  padding: 10px 12px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+/* Texto auxiliar */
+.muted{
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+/* Rodapé */
+.rodape{
+  margin-top: 26px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+}
+
+small{ color: var(--muted); }

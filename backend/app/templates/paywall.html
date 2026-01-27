@@ -1,0 +1,75 @@
+{# backend/app/templates/paywall.html #}
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page">
+  <div class="container">
+    <div class="card">
+      <div class="card-header">
+        <h1 class="title">Liberar acesso ao Gerador de Propostas</h1>
+        <p class="subtitle">
+          Gere propostas profissionais em minutos — com texto pronto pra copiar e PDF bonito.
+        </p>
+      </div>
+
+      <div class="card-body">
+
+        <div class="alert alert-warning" style="margin-bottom: 16px;">
+          <strong>Status:</strong> acesso pendente
+        </div>
+
+        <p style="margin: 0 0 18px 0;">
+          <strong>Sua conta:</strong> {{ user.email }}
+        </p>
+
+        <div class="card" style="padding: 18px; border-radius: 14px; margin-bottom: 18px;">
+          <div style="font-weight: 700; letter-spacing: .04em; text-transform: uppercase; opacity: .8; margin-bottom: 10px;">
+            O que você recebe
+          </div>
+
+          <ul style="line-height: 1.7; margin: 0 0 12px 18px;">
+            <li>Texto de proposta pronto pra copiar e colar (WhatsApp, email ou Direct)</li>
+            <li>PDF profissional com “cara de empresa”</li>
+            <li>Histórico salvo por cliente pra reutilizar depois</li>
+          </ul>
+
+          <div style="margin-top: 12px; opacity: .85;">
+            Pagamento único • acesso imediato
+          </div>
+
+          <div style="font-size: 44px; font-weight: 800; margin: 8px 0 14px 0;">
+            R$ 29,90
+          </div>
+
+          <div style="display:flex; gap:12px; flex-wrap: wrap;">
+            {# ✅ Aqui vai o link do checkout real quando você plugar Kiwify/Stripe #}
+            {# Por enquanto, deixa como link externo vazio ou "#", mas sem texto técnico. #}
+            <a class="btn btn-primary" href="#" style="min-width: 260px; text-align:center;">
+              Liberar acesso agora — R$ 29,90
+            </a>
+
+            <a class="btn btn-secondary" href="/logout">
+              Sair
+            </a>
+          </div>
+
+          <p style="margin-top: 14px; color: var(--muted); font-size: 14px;">
+            Em menos de 2 minutos você cria e envia uma proposta organizada que passa confiança.
+          </p>
+        </div>
+
+        <div class="card" style="padding: 16px; border-radius: 14px;">
+          <div style="font-weight: 700; margin-bottom: 8px;">
+            Quando vale a pena?
+          </div>
+          <p style="margin:0; line-height: 1.6;">
+            Quando o cliente pede proposta “pra hoje” e você quer responder rápido, com clareza e aparência profissional — sem travar escrevendo.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

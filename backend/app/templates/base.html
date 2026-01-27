@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title or APP_NAME }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <header class="topo">
+        <div class="container">
+            <h1 class="logo">{{ APP_NAME }}</h1>
+
+            {% if user %}
+                <nav class="nav">
+                    <a href="/create">Criar Proposta</a>
+                    <a href="/history">Histórico</a>
+                    <a href="/logout">Sair</a>
+                </nav>
+            {% endif %}
+        </div>
+    </header>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="rodape">
+        <div class="container">
+            <small>© 2026 • {{ APP_NAME }}</small>
+        </div>
+    </footer>
+</body>
+</html>

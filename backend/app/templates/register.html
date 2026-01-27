@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Criar conta</h2>
+
+<form method="post" action="/register" class="card">
+    {% if error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <label>
+        Email
+        <input type="email" name="email" required>
+    </label>
+
+    <label>
+        Senha
+        <input type="password" name="password" required minlength="6">
+    </label>
+
+    <button type="submit">Criar conta</button>
+</form>
+
+<p class="muted">
+    Já tem conta?
+    <a href="/login">Entrar</a>
+</p>
+{% endblock %}

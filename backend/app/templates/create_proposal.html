@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Criar Proposta</h2>
+
+{% if error %}
+    <div class="error">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="/create" class="card">
+
+    <h3>Dados do Cliente</h3>
+
+    <label>
+        Nome do cliente
+        <input type="text" name="client_name" required>
+    </label>
+
+    <label>
+        Serviço
+        <input type="text" name="service" required>
+    </label>
+
+    <h3>Detalhes do Serviço</h3>
+
+    <label>
+        Escopo do serviço
+        <textarea name="scope" rows="4" placeholder="Descreva o que está incluso"></textarea>
+    </label>
+
+    <label>
+        Prazo
+        <input type="text" name="deadline" placeholder="Ex: 7 dias, até 30/01">
+    </label>
+
+    <label>
+        Preço / Investimento
+        <input type="text" name="price" placeholder="Ex: R$ 1.500">
+    </label>
+
+    <label>
+        Condições de pagamento
+        <input type="text" name="payment_terms" placeholder="Ex: 50% entrada, 50% na entrega">
+    </label>
+
+    <h3>Argumentos de Venda</h3>
+
+    <label>
+        Diferenciais
+        <textarea name="differentiators" rows="3" placeholder="Por que você é a melhor opção?"></textarea>
+    </label>
+
+    <label>
+        Garantia / Suporte
+        <textarea name="warranty_support" rows="3" placeholder="Ex: suporte por 7 dias após entrega"></textarea>
+    </label>
+
+    <h3>Estilo da Proposta</h3>
+
+    <label>
+        Tom da comunicação
+        <select name="tone">
+            <option value="direto">Direto</option>
+            <option value="formal">Formal</option>
+            <option value="amigável">Amigável</option>
+        </select>
+    </label>
+
+    <label>
+        Objetivo da proposta
+        <select name="objective">
+            <option value="fechar rápido">Fechar rápido</option>
+            <option value="qualificar">Qualificar</option>
+            <option value="alto ticket">Alto ticket</option>
+        </select>
+    </label>
+
+    <button type="submit">Gerar Proposta</button>
+
+</form>
+{% endblock %}

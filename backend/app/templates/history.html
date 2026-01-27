@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Histórico</h2>
+
+{% if proposals and proposals|length > 0 %}
+  <div class="card">
+    <p class="muted">Últimas {{ proposals|length }} propostas (máximo 50)</p>
+
+    <div style="overflow:auto;">
+      <table style="width:100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid #dcdcdc;">Data</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid #dcdcdc;">Cliente</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid #dcdcdc;">Serviço</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid #dcdcdc;">Valor</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid #dcdcdc;">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in proposals %}
+          <tr>
+            <td style="padding:10px; border-bottom:1px solid #eee;">
+              {{ p.created_at.strftime("%d/%m/%Y %H:%M") if p.created_at else "" }}
+            </td>
+            <td style="padding:10px; border-bottom:1px solid #eee;">
+              {{ p.client_name }}
+            </td>
+            <td style="padding:10px; border-bottom:1px solid #eee;">
+              {{ p.service }}
+            </td>
+            <td style="padding:10px; border-bottom:1px solid #eee;">
+              {{ p.price }}
+            </td>
+            <td style="padding:10px; border-bottom:1px solid #eee;">
+              <a href="/proposal/{{ p.id }}">Abrir</a>
+              &nbsp;•&nbsp;
+              <a href="/proposal/{{ p.id }}/pdf">PDF</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% else %}
+  <div class="card">
+    <p>Nenhuma proposta ainda.</p>
+    <a href="/create"><button type="button">Criar primeira proposta</button></a>
+  </div>
+{% endif %}
+
+{% endblock %}

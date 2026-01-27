@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gerador de Propostas que Fecham Vendas</title>
+  <style>
+    :root{
+      --bg:#0b1220;
+      --card:#0f1a33;
+      --text:#eaf0ff;
+      --muted:#b8c2e0;
+      --border:rgba(255,255,255,.12);
+      --primary:#2563eb;
+      --primary2:#1d4ed8;
+      --ok:#22c55e;
+      --max: 980px;
+      --radius: 18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: radial-gradient(1000px 600px at 20% 0%, rgba(37,99,235,.35), transparent 55%),
+                  radial-gradient(900px 500px at 100% 10%, rgba(34,197,94,.18), transparent 55%),
+                  var(--bg);
+      color: var(--text);
+      line-height:1.45;
+    }
+    a{color:inherit}
+    .wrap{max-width:var(--max); margin:0 auto; padding:28px 18px 46px}
+    .top{
+      display:flex; gap:16px; align-items:center; justify-content:space-between; flex-wrap:wrap;
+      margin-bottom:18px;
+    }
+    .brand{
+      font-weight:900; letter-spacing:-.2px; font-size:18px;
+      display:flex; align-items:center; gap:10px;
+    }
+    .pill{
+      font-size:12px; padding:6px 10px; border:1px solid var(--border);
+      border-radius:999px; color:var(--muted);
+      background:rgba(255,255,255,.05);
+    }
+    .hero{
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:18px;
+      align-items:stretch;
+      margin: 18px 0 18px;
+    }
+    @media(max-width:900px){ .hero{grid-template-columns:1fr} }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: 0 18px 60px rgba(0,0,0,.35);
+    }
+    h1{
+      margin:6px 0 10px;
+      font-size: 36px;
+      line-height:1.08;
+      letter-spacing:-.8px;
+    }
+    .sub{
+      color: var(--muted);
+      font-size: 16px;
+      margin: 0 0 14px;
+    }
+    .bullets{margin:14px 0 0; padding:0; list-style:none; display:grid; gap:10px}
+    .bullets li{
+      display:flex; gap:10px; align-items:flex-start;
+      color: var(--text);
+      padding:10px 12px;
+      border:1px solid var(--border);
+      border-radius: 14px;
+      background:rgba(255,255,255,.03);
+    }
+    .check{
+      width:18px; height:18px; flex:0 0 18px;
+      border-radius: 6px;
+      background: rgba(34,197,94,.18);
+      border: 1px solid rgba(34,197,94,.35);
+      display:inline-flex; align-items:center; justify-content:center;
+      margin-top:2px;
+    }
+    .ctaBox h2{margin:0 0 10px; font-size:18px}
+    .price{
+      display:flex; gap:10px; align-items:baseline; flex-wrap:wrap;
+      margin: 10px 0 12px;
+    }
+    .price .big{font-size:34px; font-weight:900}
+    .price .small{color:var(--muted)}
+    .btn{
+      display:inline-block;
+      width:100%;
+      text-align:center;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: var(--primary);
+      border:1px solid rgba(255,255,255,.12);
+      color:#fff;
+      font-weight:900;
+      text-decoration:none;
+      transition:.15s ease;
+    }
+    .btn:hover{background:var(--primary2)}
+    .btn2{
+      display:inline-block;
+      width:100%;
+      text-align:center;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.06);
+      border:1px solid var(--border);
+      color:#fff;
+      font-weight:800;
+      text-decoration:none;
+      margin-top:10px;
+    }
+    .grid3{
+      display:grid; grid-template-columns: repeat(3, 1fr); gap:14px; margin-top:14px;
+    }
+    @media(max-width:900px){ .grid3{grid-template-columns:1fr} }
+    .box h3{margin:0 0 8px; font-size:14px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px}
+    .box p{margin:0; color:var(--text)}
+    .sectionTitle{
+      margin: 22px 0 10px;
+      font-size: 18px;
+      letter-spacing:-.2px;
+    }
+    .faq details{
+      border:1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 12px;
+      background: rgba(255,255,255,.03);
+      margin-top:10px;
+    }
+    .faq summary{
+      cursor:pointer;
+      font-weight:900;
+    }
+    .faq p{color:var(--muted); margin:10px 0 0}
+    .footer{
+      margin-top:18px;
+      color:var(--muted);
+      font-size:12px;
+      opacity:.9;
+      display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;
+    }
+    .note{
+      margin-top:12px;
+      color:var(--muted);
+      font-size:12px;
+      border-top:1px solid var(--border);
+      padding-top:12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">
+        <span>Gerador de Propostas que Fecham Vendas</span>
+        <span class="pill">MVP • PDF • Copy/Paste</span>
+      </div>
+      <div class="pill">Acesso imediato • Uso simples</div>
+    </div>
+
+    <div class="hero">
+      <div class="card">
+        <div class="pill">Pare de perder cliente por “falta de proposta”</div>
+        <h1>Gere propostas profissionais em minutos — com texto pronto pra copiar e PDF bonito.</h1>
+        <p class="sub">
+          Você preenche um formulário simples e o sistema entrega uma proposta clara, persuasiva e organizada.
+          Ideal para quem quer fechar mais rápido sem ficar travado escrevendo.
+        </p>
+
+        <ul class="bullets">
+          <li><span class="check">✓</span><span><b>Texto pronto (copiar e colar)</b> — mande no WhatsApp, email ou Direct.</span></li>
+          <li><span class="check">✓</span><span><b>PDF profissional</b> — entrega com “cara de empresa”, sem dor de cabeça.</span></li>
+          <li><span class="check">✓</span><span><b>Histórico por cliente</b> — encontre propostas antigas em segundos.</span></li>
+          <li><span class="check">✓</span><span><b>Tom e objetivo</b> — formal/direto/amigável + fechar rápido/qualificar/alto ticket.</span></li>
+        </ul>
+
+        <div class="grid3">
+          <div class="card box">
+            <h3>Para quem é</h3>
+            <p>Freelancers, designers, social media, tráfego, devs e prestadores de serviço.</p>
+          </div>
+          <div class="card box">
+            <h3>Quando usar</h3>
+            <p>Quando o cliente pede proposta “pra hoje” e você quer responder rápido e bem.</p>
+          </div>
+          <div class="card box">
+            <h3>Resultado</h3>
+            <p>Mais agilidade, mais profissionalismo e mais chance de fechar.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card ctaBox">
+        <h2>Garanta acesso agora</h2>
+
+        <!-- Troque os valores abaixo pelo seu preço real -->
+        <div class="price">
+          <div class="big">R$ 29,90</div>
+          <div class="small">pagamento único • acesso imediato</div>
+        </div>
+
+        <!-- Troque o link abaixo pelo link do seu checkout -->
+        <a class="btn" href="#" id="btnCheckout">Quero gerar minhas propostas</a>
+        <a class="btn2" href="#faq">Ver dúvidas frequentes</a>
+
+        <div class="note">
+          <b>O que você recebe:</b><br/>
+          • Acesso ao sistema<br/>
+          • Gerador automático de propostas<br/>
+          • PDF pronto para enviar<br/>
+          • Histórico das propostas
+        </div>
+      </div>
+    </div>
+
+    <h2 class="sectionTitle">O que muda na prática</h2>
+    <div class="grid3">
+      <div class="card box">
+        <h3>Antes</h3>
+        <p>Você demora, escreve correndo, fica inseguro e perde timing.</p>
+      </div>
+      <div class="card box">
+        <h3>Depois</h3>
+        <p>Você envia rápido, com clareza e uma estrutura que passa confiança.</p>
+      </div>
+      <div class="card box">
+        <h3>Fechamento</h3>
+        <p>Seu cliente vê organização e profissionalismo — e avança para o “próximo passo”.</p>
+      </div>
+    </div>
+
+    <h2 class="sectionTitle" id="faq">FAQ</h2>
+    <div class="faq">
+      <details>
+        <summary>Eu preciso saber escrever bem?</summary>
+        <p>Não. Você preenche os campos e o sistema monta a proposta com estrutura profissional.</p>
+      </details>
+
+      <details>
+        <summary>Posso copiar o texto e mandar no WhatsApp?</summary>
+        <p>Sim. O resultado vem em texto pronto para copiar e colar.</p>
+      </details>
+
+      <details>
+        <summary>O PDF sai bonito mesmo?</summary>
+        <p>Sim. Ele já sai formatado e organizado, pronto para enviar ao cliente.</p>
+      </details>
+
+      <details>
+        <summary>Fica salvo meu histórico?</summary>
+        <p>Sim. As últimas propostas ficam registradas por usuário, com data, cliente e valor.</p>
+      </details>
+
+      <details>
+        <summary>Tem mensalidade?</summary>
+        <p>Use como quiser. (Você pode ajustar este texto conforme seu modelo de pagamento.)</p>
+      </details>
+
+      <details>
+        <summary>Funciona sem IA?</summary>
+        <p>Sim. Existe modo grátis/local (template inteligente). E você pode ativar modo GPT quando quiser.</p>
+      </details>
+    </div>
+
+    <div class="footer">
+      <div>© 2026 • Gerador de Propostas que Fecham Vendas</div>
+      <div><span class="pill">Suporte: seu-email@dominio.com</span></div>
+    </div>
+  </div>
+
+  <script>
+    // Troque pelo seu link de checkout:
+    // document.getElementById("btnCheckout").href = "https://SEU_CHECKOUT_AQUI";
+  </script>
+</body>
+</html>
