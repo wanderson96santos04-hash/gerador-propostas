@@ -42,11 +42,23 @@
           </div>
 
           <div style="display:flex; gap:12px; flex-wrap: wrap;">
-            {# ✅ Aqui vai o link do checkout real quando você plugar Kiwify/Stripe #}
-            {# Por enquanto, deixa como link externo vazio ou "#", mas sem texto técnico. #}
-            <a class="btn btn-primary" href="#" style="min-width: 260px; text-align:center;">
-              Liberar acesso agora — R$ 29,90
-            </a>
+            {# ✅ Usa a variável de ambiente que você colocou no Render #}
+            {# Você já tem templates.env.globals["KIWIFY_CHECKOUT_URL"] no main.py #}
+
+            {% if KIWIFY_CHECKOUT_URL %}
+              <a class="btn btn-primary"
+                 href="{{ KIWIFY_CHECKOUT_URL }}"
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 style="min-width: 260px; text-align:center;">
+                Liberar acesso agora — R$ 29,90
+              </a>
+            {% else %}
+              <button class="btn btn-primary" disabled
+                      style="min-width: 260px; text-align:center; opacity:.6;">
+                Checkout indisponível (KIWIFY_CHECKOUT_URL vazio)
+              </button>
+            {% endif %}
 
             <a class="btn btn-secondary" href="/logout">
               Sair
