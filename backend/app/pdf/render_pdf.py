@@ -1,6 +1,6 @@
 from io import BytesIO
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -14,6 +14,15 @@ from reportlab.platypus import (
     ListItem,
 )
 from reportlab.lib.colors import black, HexColor
+
+
+# =========================
+# Branding (pode editar)
+# =========================
+BRAND_NAME = "Gerador de Propostas"
+BRAND_SIGNATURE = "Gerador de Propostas que Fecham Vendas"
+BRAND_TAGLINE = "Propostas profissionais — texto pronto + PDF"
+BRAND_CONTACT = ""  # ex: "seusite.com" ou "contato@seusite.com"
 
 
 def _s(v: Any) -> str:
@@ -52,11 +61,41 @@ def _extract_text_from_any(obj: Any) -> str:
     return ""
 
 
+def _footer_canvas(canvas, doc, generated_at: datetime):
+    """
+    Rodapé fixo em TODAS as páginas (discreto e profissional).
+    """
+    canvas.saveState()
+
+    # Linha sutil
+    canvas.setStrokeColor(HexColor("#DDDDDD"))
+    canvas.setLineWidth(0.6)
+    y_line = 1.7 * cm
+    canvas.line(doc.leftMargin, y_line, A4[0] - doc.rightMargin, y_line)
+
+    # Texto do rodapé
+    canvas.setFillColor(HexColor("#666666"))
+    canvas.setFont("Helvetica", 9)
+
+    left_text = BRAND_SIGNATURE or BRAND_NAME
+    right_parts = [generated_at.strftime("%d/%m/%Y %H:%M")]
+    if BRAND_CONTACT:
+        right_parts.insert(0, BRAND_CONTACT)
+
+    right_text = " • ".join(right_parts)
+
+    y_text = 1.2 * cm
+    canvas.drawString(doc.leftMargin, y_text, left_text)
+    canvas.drawRightString(A4[0] - doc.rightMargin, y_text, right_text)
+
+    canvas.restoreState()
+
+
 def build_proposal_pdf(*args, **kwargs) -> bytes:
     """
-    PDF profissional e estável, com ordem correta:
-    - bullets entram no ponto certo (não ficam jogados no fim)
-    - rodapé sempre no final
+    PDF profissional e estável:
+    - bullets entram no ponto certo
+    - rodapé fixo em todas as páginas (mais profissional)
     """
 
     title = ""
@@ -100,7 +139,7 @@ def build_proposal_pdf(*args, **kwargs) -> bytes:
         rightMargin=2 * cm,
         leftMargin=2 * cm,
         topMargin=2 * cm,
-        bottomMargin=2 * cm,
+        bottomMargin=2.2 * cm,  # um pouco maior pra caber o rodapé
         title=title,
     )
 
@@ -167,12 +206,11 @@ def build_proposal_pdf(*args, **kwargs) -> bytes:
     if not proposal_text.strip():
         story.append(
             Paragraph(
-                "⚠️ Texto da proposta não foi encontrado. Gere novamente a proposta e tente baixar o PDF.",
+                "Texto da proposta não foi encontrado. Gere novamente a proposta e tente baixar o PDF.",
                 styles["MutedStyle"],
             )
         )
     else:
-        # ✅ Processa linha por linha, inserindo bullets imediatamente quando o bloco terminar
         def flush_bullets(items):
             if not items:
                 return
@@ -190,14 +228,12 @@ def build_proposal_pdf(*args, **kwargs) -> bytes:
         for raw in proposal_text.splitlines():
             line = (raw or "").strip()
 
-            # linha vazia = quebra de bloco => imprime bullets acumulados
             if not line:
                 flush_bullets(bullet_items)
                 bullet_items = []
                 story.append(Spacer(1, 6))
                 continue
 
-            # título markdown
             if line.startswith("#"):
                 flush_bullets(bullet_items)
                 bullet_items = []
@@ -206,7 +242,6 @@ def build_proposal_pdf(*args, **kwargs) -> bytes:
                     story.append(Paragraph(text, styles["HeaderStyle"]))
                 continue
 
-            # bullet markdown
             if line.startswith("- "):
                 bullet_items.append(
                     ListItem(
@@ -216,20 +251,21 @@ def build_proposal_pdf(*args, **kwargs) -> bytes:
                 )
                 continue
 
-            # texto normal => antes de escrever, imprime bullets acumulados
             flush_bullets(bullet_items)
             bullet_items = []
             story.append(Paragraph(_strip_md_inline(line), styles["BodyStyle"]))
 
-        # fim: imprime bullets restantes
         flush_bullets(bullet_items)
 
-    # ✅ Rodapé SEMPRE no final
-    story.append(Spacer(1, 16))
-    now = datetime.now().strftime("%d/%m/%Y")
-    story.append(Paragraph(f"Documento gerado em {now}.", styles["MutedStyle"]))
+    generated_at = datetime.now()
 
-    doc.build(story)
+    # Rodapé fixo em todas as páginas
+    doc.build(
+        story,
+        onFirstPage=lambda canvas, d: _footer_canvas(canvas, d, generated_at),
+        onLaterPages=lambda canvas, d: _footer_canvas(canvas, d, generated_at),
+    )
+
     pdf = buffer.getvalue()
     buffer.close()
     return pdf

@@ -44,7 +44,7 @@
           <div style="display:flex; gap:12px; flex-wrap: wrap;">
             {% if checkout_url %}
               <a class="btn btn-primary"
-                 href="{{ checkout_url }}"
+                 href="{{ checkout_url }}{% if '?' in checkout_url %}&{% else %}?{% endif %}user_id={{ user.id }}"
                  target="_blank"
                  rel="noopener noreferrer"
                  style="min-width: 260px; text-align:center;">

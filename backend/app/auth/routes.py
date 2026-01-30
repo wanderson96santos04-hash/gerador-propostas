@@ -1,5 +1,5 @@
 # backend/app/auth/routes.py
-import os  # ✅ necessário para ler KIWIFY_CHECKOUT_URL do ambiente
+import os  # necessário para ler KIWIFY_CHECKOUT_URL do ambiente
 
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import RedirectResponse, PlainTextResponse
@@ -20,10 +20,14 @@ router = APIRouter()
 COOKIE_NAME = "access_token"
 
 
+# =========================
+# AUTH HELPERS
+# =========================
 def get_current_user(request: Request, db: Session) -> User | None:
     token = request.cookies.get(COOKIE_NAME)
     if not token:
         return None
+
     payload = decode_access_token(token)
     if not payload:
         return None
@@ -49,7 +53,7 @@ def require_user(request: Request, db: Session) -> User:
 
 def require_paid_user(request: Request, db: Session) -> User:
     """
-    ✅ Produto vendável:
+    Produto vendável:
     - precisa estar logado
     - precisa estar com is_paid=True
     """
@@ -59,6 +63,9 @@ def require_paid_user(request: Request, db: Session) -> User:
     return user
 
 
+# =========================
+# REGISTER
+# =========================
 @router.get("/register")
 def register_page(request: Request):
     return request.app.state.templates.TemplateResponse(
@@ -98,7 +105,7 @@ def register_action(
             status_code=400,
         )
 
-    # ✅ Por padrão, usuário entra NÃO pago
+    # usuário entra NÃO pago
     user = User(email=email, password_hash=pwd_hash, is_paid=False)
     db.add(user)
     db.commit()
@@ -106,9 +113,7 @@ def register_action(
 
     token = create_access_token(user.id, user.email)
 
-    # ✅ Não manda pro /create direto: manda pro paywall
     resp = RedirectResponse(url="/paywall", status_code=303)
-
     resp.set_cookie(
         key=COOKIE_NAME,
         value=token,
@@ -120,6 +125,9 @@ def register_action(
     return resp
 
 
+# =========================
+# LOGIN / LOGOUT
+# =========================
 @router.get("/login")
 def login_page(request: Request):
     return request.app.state.templates.TemplateResponse(
@@ -146,11 +154,9 @@ def login_action(
         )
 
     token = create_access_token(user.id, user.email)
-
-    # ✅ Se pagou, vai pro app. Se não pagou, vai pro paywall.
     next_url = "/create" if user.is_paid else "/paywall"
-    resp = RedirectResponse(url=next_url, status_code=303)
 
+    resp = RedirectResponse(url=next_url, status_code=303)
     resp.set_cookie(
         key=COOKIE_NAME,
         value=token,
@@ -169,34 +175,47 @@ def logout():
     return resp
 
 
-# ✅ Tela de compra / instruções
+# =========================
+# PAYWALL (DEBUG DEFINITIVO)
+# =========================
 @router.get("/paywall")
 def paywall(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
+
     if user.is_paid:
         return RedirectResponse(url="/create", status_code=303)
 
-    # ✅ pega o checkout real do Render (Environment Variables)
     checkout_url = (os.getenv("KIWIFY_CHECKOUT_URL") or "").strip()
-
-    # (opcional) fallback: se alguém colocou no settings futuramente
     if not checkout_url:
         checkout_url = (getattr(settings, "kiwify_checkout_url", "") or "").strip()
+
+    # 🔴 DEBUG DEFINITIVO (prova de deploy)
+    print(
+        "PAYWALL DEBUG >>> user_id =",
+        user.id,
+        "| checkout_before =",
+        checkout_url,
+    )
+
+    if checkout_url:
+        sep = "&" if "?" in checkout_url else "?"
+        checkout_url = f"{checkout_url}{sep}user_id={user.id}&dbg=PAYWALL_OK"
 
     return request.app.state.templates.TemplateResponse(
         "paywall.html",
         {
             "request": request,
             "user": user,
-            "checkout_url": checkout_url,  # ✅ agora o template recebe o link real
+            "checkout_url": checkout_url,
         },
     )
 
 
-# ✅ Admin manual (MVP): liberar acesso
-# Exemplo: /admin/unlock?email=teste@teste.com&key=SUA_CHAVE
+# =========================
+# ADMIN UNLOCK (MVP)
+# =========================
 @router.get("/admin/unlock")
 def admin_unlock(
     request: Request,
@@ -220,14 +239,18 @@ def admin_unlock(
     return PlainTextResponse("ok_unlocked")
 
 
-# ✅ Debug: mostra se o cookie chegou no servidor
+# =========================
+# DEBUG AUXILIAR
+# =========================
 @router.get("/debug-cookie")
 def debug_cookie(request: Request):
     token = request.cookies.get(COOKIE_NAME)
     return PlainTextResponse(f"cookie_recebido={bool(token)}")
+
+
 @router.get("/debug-kiwify")
 def debug_kiwify():
-    import os
     v = (os.getenv("KIWIFY_CHECKOUT_URL") or "").strip()
-    return PlainTextResponse(f"KIWIFY_CHECKOUT_URL={'OK' if v else 'VAZIO'} len={len(v)} value={v[:80]}")
-
+    return PlainTextResponse(
+        f"KIWIFY_CHECKOUT_URL={'OK' if v else 'VAZIO'} len={len(v)} value={v[:80]}"
+    )
