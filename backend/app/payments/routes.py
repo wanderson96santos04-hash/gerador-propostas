@@ -1,4 +1,4 @@
-print(">>> KIWIFY ROUTES.PY CARREGADO (versao NEVER400 v4 - SCALE USER_ID + FIX POST-PAYMENT) <<<")
+print(">>> KIWIFY ROUTES.PY CARREGADO (versao NEVER400 v5 - REAL SCALE VIA CUSTOM_FIELDS/METADATA) <<<")
 
 import os
 from datetime import datetime
@@ -12,7 +12,6 @@ from sqlalchemy import func
 from app.db.session import SessionLocal
 from app.db import models
 
-# ✅ usa o parser "robusto" que você já tem
 from app.payments.kiwify import is_payment_approved, extract_buyer_email
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
@@ -62,6 +61,73 @@ def _safe_int(v: Any) -> Optional[int]:
         return None
 
 
+def _extract_user_id_from_payload(data: Dict[str, Any]) -> Optional[int]:
+    """
+    ✅ O user_id NÃO vem em request.query_params no webhook da Kiwify.
+    Ele precisa estar DENTRO do payload, em algum campo customizado/metadata.
+
+    Tentamos vários locais comuns:
+    - data.user_id / data.customer_id
+    - data.metadata.user_id
+    - data.custom_fields.user_id
+    - data.order.custom_fields.user_id
+    - data.order.metadata.user_id
+    - data.buyer.custom_fields.user_id
+    - data.buyer.metadata.user_id
+    """
+    # 1) nível raiz
+    direct = _pick(data, "user_id", "customer_id")
+    uid = _safe_int(direct)
+    if uid is not None:
+        return uid
+
+    # 2) metadata raiz
+    meta = data.get("metadata")
+    if isinstance(meta, dict):
+        uid = _safe_int(_pick(meta, "user_id", "customer_id", "external_id"))
+        if uid is not None:
+            return uid
+
+    # 3) custom_fields raiz
+    cf = data.get("custom_fields")
+    if isinstance(cf, dict):
+        uid = _safe_int(_pick(cf, "user_id", "customer_id", "external_id"))
+        if uid is not None:
+            return uid
+
+    # 4) order.*
+    order = data.get("order")
+    if isinstance(order, dict):
+        order_cf = order.get("custom_fields")
+        if isinstance(order_cf, dict):
+            uid = _safe_int(_pick(order_cf, "user_id", "customer_id", "external_id"))
+            if uid is not None:
+                return uid
+
+        order_meta = order.get("metadata")
+        if isinstance(order_meta, dict):
+            uid = _safe_int(_pick(order_meta, "user_id", "customer_id", "external_id"))
+            if uid is not None:
+                return uid
+
+    # 5) buyer.*
+    buyer = data.get("buyer")
+    if isinstance(buyer, dict):
+        buyer_cf = buyer.get("custom_fields")
+        if isinstance(buyer_cf, dict):
+            uid = _safe_int(_pick(buyer_cf, "user_id", "customer_id", "external_id"))
+            if uid is not None:
+                return uid
+
+        buyer_meta = buyer.get("metadata")
+        if isinstance(buyer_meta, dict):
+            uid = _safe_int(_pick(buyer_meta, "user_id", "customer_id", "external_id"))
+            if uid is not None:
+                return uid
+
+    return None
+
+
 @router.post("/kiwify")
 async def kiwify_webhook(request: Request):
     """
@@ -71,9 +137,9 @@ async def kiwify_webhook(request: Request):
     ✅ Nunca retornar 400/500 para a Kiwify (sempre 200).
     ✅ Se der erro, retorna 200 e registra motivo.
 
-    MODO ESCALA:
-    ✅ Prioriza liberar por user_id (enviado no link do checkout: ?user_id=123)
-    ✅ Fallback por email (case-insensitive)
+    ✅ MODO ESCALA (correto):
+    - user_id tem que estar NO PAYLOAD (custom_fields/metadata)
+    - fallback por email (case-insensitive)
     """
 
     try:
@@ -117,7 +183,7 @@ async def kiwify_webhook(request: Request):
         data = _nested(payload)
 
         # =========================
-        # 2) Identificar event_id (pra idempotência)
+        # 2) Identificar event_id (idempotência)
         # =========================
         event_id = _pick(
             data,
@@ -128,45 +194,38 @@ async def kiwify_webhook(request: Request):
             "charge_id",
             "sale_id",
         )
-
         if not event_id:
             raw = await request.body()
             event_id = f"noid-{len(raw)}-{datetime.utcnow().isoformat()}"
 
         # =========================
-        # 3) Só processar se for pagamento aprovado
+        # 3) Só processar se aprovado
         # =========================
         if not is_payment_approved(data):
             ev = _pick(data, "event", "type", "status") or "unknown"
             return {"ok": True, "ignored": True, "reason": "nao_aprovado", "event": ev}
 
         # =========================
-        # 4) Extrair email do comprador (fallback)
+        # 4) Extrair user_id (REAL) + email fallback
         # =========================
+        user_id = _extract_user_id_from_payload(data)
+
         buyer_email = extract_buyer_email(data)
         buyer_email = buyer_email.strip().lower() if buyer_email else None
 
-        # =========================
-        # 4.5) Pegar user_id do checkout (MODO ESCALA)
-        # =========================
-        # A forma mais confiável é enviar ?user_id=<id> no link do checkout.
-        # Alguns gateways também podem devolver em "metadata".
-        user_id_raw = (
-            request.query_params.get("user_id")
-            or _pick(data, "user_id", "customer_id")
-            or _pick(data.get("metadata", {}) if isinstance(data.get("metadata"), dict) else {}, "user_id")
-            or _pick(data.get("custom_fields", {}) if isinstance(data.get("custom_fields"), dict) else {}, "user_id")
-        )
-        user_id = _safe_int(user_id_raw)
+        print("KIWIFY_WEBHOOK >>> approved",
+              "| event_id=", str(event_id),
+              "| user_id=", user_id,
+              "| email=", buyer_email)
 
         # =========================
-        # 5) Liberar acesso + idempotência (SEM travar antes do user)
+        # 5) Liberar acesso + idempotência
         # =========================
         db: Session = SessionLocal()
         try:
             WebhookEvent = _get_webhook_event_model()
 
-            # 5.0) Idempotência: se já processou, não faz nada
+            # 5.0) idempotência
             if WebhookEvent is not None:
                 try:
                     already = (
@@ -179,12 +238,12 @@ async def kiwify_webhook(request: Request):
                 except Exception as e:
                     print("KIWIFY_WEBHOOK idempotency check error (ignored):", repr(e))
 
-            # 5.1) Achar o usuário: PRIORIDADE user_id
+            # 5.1) achar usuário: prioridade user_id
             user = None
             if user_id is not None:
                 user = db.query(models.User).filter(models.User.id == user_id).one_or_none()
 
-            # 5.2) Fallback por email (case-insensitive)
+            # 5.2) fallback por email
             if user is None and buyer_email:
                 user = (
                     db.query(models.User)
@@ -193,7 +252,6 @@ async def kiwify_webhook(request: Request):
                 )
 
             if not user:
-                # Não grava WebhookEvent aqui, pra permitir retry.
                 reason = "user_nao_encontrado"
                 if user_id is not None and buyer_email:
                     reason += f":user_id={user_id};email={buyer_email}"
@@ -205,7 +263,7 @@ async def kiwify_webhook(request: Request):
                     reason += ":sem_user_id_sem_email"
                 return {"ok": True, "ignored": True, "reason": reason, "event_id": str(event_id)}
 
-            # 5.3) Liberar acesso
+            # 5.3) liberar
             changed = False
             if not getattr(user, "is_paid", False):
                 user.is_paid = True
@@ -215,7 +273,7 @@ async def kiwify_webhook(request: Request):
             else:
                 db.rollback()
 
-            # 5.4) Registrar idempotência só DEPOIS de liberar (se existir)
+            # 5.4) registrar event
             if WebhookEvent is not None:
                 try:
                     event = WebhookEvent(
@@ -244,11 +302,9 @@ async def kiwify_webhook(request: Request):
             db.close()
 
     except Exception as e:
-        # ✅ NUNCA MAIS 400/500 — SEMPRE 200
         body = await request.body()
         print("KIWIFY_WEBHOOK ERRO:", repr(e))
         print("KIWIFY_WEBHOOK QUERY:", dict(request.query_params))
         print("KIWIFY_WEBHOOK HEADER x-kiwify-token:", request.headers.get("x-kiwify-token"))
         print("KIWIFY_WEBHOOK BODY (primeiros 2000):", body.decode("utf-8", "ignore")[:2000])
-
         return {"ok": True, "ignored": True, "debug_error": str(e)}

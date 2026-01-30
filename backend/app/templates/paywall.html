@@ -43,8 +43,9 @@
 
           <div style="display:flex; gap:12px; flex-wrap: wrap;">
             {% if checkout_url %}
+              {# ✅ NÃO anexar user_id aqui (já vai pronto do backend). Isso evita duplicar user_id=user_id=... #}
               <a class="btn btn-primary"
-                 href="{{ checkout_url }}{% if '?' in checkout_url %}&{% else %}?{% endif %}user_id={{ user.id }}"
+                 href="{{ checkout_url }}"
                  target="_blank"
                  rel="noopener noreferrer"
                  style="min-width: 260px; text-align:center;">

@@ -20,14 +20,10 @@ router = APIRouter()
 COOKIE_NAME = "access_token"
 
 
-# =========================
-# AUTH HELPERS
-# =========================
 def get_current_user(request: Request, db: Session) -> User | None:
     token = request.cookies.get(COOKIE_NAME)
     if not token:
         return None
-
     payload = decode_access_token(token)
     if not payload:
         return None
@@ -63,9 +59,6 @@ def require_paid_user(request: Request, db: Session) -> User:
     return user
 
 
-# =========================
-# REGISTER
-# =========================
 @router.get("/register")
 def register_page(request: Request):
     return request.app.state.templates.TemplateResponse(
@@ -125,9 +118,6 @@ def register_action(
     return resp
 
 
-# =========================
-# LOGIN / LOGOUT
-# =========================
 @router.get("/login")
 def login_page(request: Request):
     return request.app.state.templates.TemplateResponse(
@@ -176,14 +166,13 @@ def logout():
 
 
 # =========================
-# PAYWALL (DEBUG DEFINITIVO)
+# PAYWALL (S1 = USER_ID)
 # =========================
 @router.get("/paywall")
 def paywall(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
-
     if user.is_paid:
         return RedirectResponse(url="/create", status_code=303)
 
@@ -191,25 +180,17 @@ def paywall(request: Request, db: Session = Depends(get_db)):
     if not checkout_url:
         checkout_url = (getattr(settings, "kiwify_checkout_url", "") or "").strip()
 
-    # 🔴 DEBUG DEFINITIVO (prova de deploy)
-    print(
-        "PAYWALL DEBUG >>> user_id =",
-        user.id,
-        "| checkout_before =",
-        checkout_url,
-    )
+    # DEBUG (temporário)
+    print("PAYWALL DEBUG >>> user_id =", user.id, "| checkout_before =", checkout_url)
 
+    # ✅ Kiwify aceita s1/s2/s3 para rastreamento (vamos usar s1=user_id)
     if checkout_url:
         sep = "&" if "?" in checkout_url else "?"
-        checkout_url = f"{checkout_url}{sep}user_id={user.id}&dbg=PAYWALL_OK"
+        checkout_url = f"{checkout_url}{sep}s1={user.id}&dbg=PAYWALL_OK"
 
     return request.app.state.templates.TemplateResponse(
         "paywall.html",
-        {
-            "request": request,
-            "user": user,
-            "checkout_url": checkout_url,
-        },
+        {"request": request, "user": user, "checkout_url": checkout_url},
     )
 
 
@@ -235,7 +216,6 @@ def admin_unlock(
     user.is_paid = True
     db.add(user)
     db.commit()
-
     return PlainTextResponse("ok_unlocked")
 
 
