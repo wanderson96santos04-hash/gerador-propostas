@@ -1,4 +1,4 @@
-print(">>> KIWIFY ROUTES.PY CARREGADO (versao NEVER400 v5 - REAL SCALE VIA CUSTOM_FIELDS/METADATA) <<<")
+print(">>> KIWIFY ROUTES.PY CARREGADO (versao NEVER400 v6 - FIX PRIORITY EMAIL + USER_ID FROM PAYLOAD) <<<")
 
 import os
 from datetime import datetime
@@ -64,7 +64,7 @@ def _safe_int(v: Any) -> Optional[int]:
 def _extract_user_id_from_payload(data: Dict[str, Any]) -> Optional[int]:
     """
     ✅ O user_id NÃO vem em request.query_params no webhook da Kiwify.
-    Ele precisa estar DENTRO do payload, em algum campo customizado/metadata.
+    Se existir, ele precisa estar DENTRO do payload (custom_fields/metadata).
 
     Tentamos vários locais comuns:
     - data.user_id / data.customer_id
@@ -137,9 +137,10 @@ async def kiwify_webhook(request: Request):
     ✅ Nunca retornar 400/500 para a Kiwify (sempre 200).
     ✅ Se der erro, retorna 200 e registra motivo.
 
-    ✅ MODO ESCALA (correto):
-    - user_id tem que estar NO PAYLOAD (custom_fields/metadata)
-    - fallback por email (case-insensitive)
+    ✅ FIX REAL:
+    - user_id geralmente NÃO chega no webhook -> não pode depender dele
+    - primeiro tenta liberar por EMAIL (mais confiável)
+    - depois tenta por user_id (se vier no payload)
     """
 
     try:
@@ -206,17 +207,19 @@ async def kiwify_webhook(request: Request):
             return {"ok": True, "ignored": True, "reason": "nao_aprovado", "event": ev}
 
         # =========================
-        # 4) Extrair user_id (REAL) + email fallback
+        # 4) Extrair email + user_id (se existir)
         # =========================
-        user_id = _extract_user_id_from_payload(data)
-
         buyer_email = extract_buyer_email(data)
         buyer_email = buyer_email.strip().lower() if buyer_email else None
 
-        print("KIWIFY_WEBHOOK >>> approved",
-              "| event_id=", str(event_id),
-              "| user_id=", user_id,
-              "| email=", buyer_email)
+        user_id = _extract_user_id_from_payload(data)
+
+        print(
+            "KIWIFY_WEBHOOK >>> approved",
+            "| event_id=", str(event_id),
+            "| email=", buyer_email,
+            "| user_id=", user_id,
+        )
 
         # =========================
         # 5) Liberar acesso + idempotência
@@ -238,18 +241,18 @@ async def kiwify_webhook(request: Request):
                 except Exception as e:
                     print("KIWIFY_WEBHOOK idempotency check error (ignored):", repr(e))
 
-            # 5.1) achar usuário: prioridade user_id
+            # 5.1) achar usuário: PRIORIDADE EMAIL (webhook confiável)
             user = None
-            if user_id is not None:
-                user = db.query(models.User).filter(models.User.id == user_id).one_or_none()
-
-            # 5.2) fallback por email
-            if user is None and buyer_email:
+            if buyer_email:
                 user = (
                     db.query(models.User)
                     .filter(func.lower(models.User.email) == buyer_email)
                     .one_or_none()
                 )
+
+            # 5.2) fallback por user_id (se veio no payload)
+            if user is None and user_id is not None:
+                user = db.query(models.User).filter(models.User.id == user_id).one_or_none()
 
             if not user:
                 reason = "user_nao_encontrado"
