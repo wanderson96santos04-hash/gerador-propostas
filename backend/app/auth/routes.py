@@ -1,4 +1,6 @@
 # backend/app/auth/routes.py
+import os  # ✅ necessário para ler KIWIFY_CHECKOUT_URL do ambiente
+
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import RedirectResponse, PlainTextResponse
 from sqlalchemy.orm import Session
@@ -176,10 +178,20 @@ def paywall(request: Request, db: Session = Depends(get_db)):
     if user.is_paid:
         return RedirectResponse(url="/create", status_code=303)
 
-    # template simples: paywall.html (vamos criar já já)
+    # ✅ pega o checkout real do Render (Environment Variables)
+    checkout_url = (os.getenv("KIWIFY_CHECKOUT_URL") or "").strip()
+
+    # (opcional) fallback: se alguém colocou no settings futuramente
+    if not checkout_url:
+        checkout_url = (getattr(settings, "kiwify_checkout_url", "") or "").strip()
+
     return request.app.state.templates.TemplateResponse(
         "paywall.html",
-        {"request": request, "user": user},
+        {
+            "request": request,
+            "user": user,
+            "checkout_url": checkout_url,  # ✅ agora o template recebe o link real
+        },
     )
 
 
@@ -213,3 +225,9 @@ def admin_unlock(
 def debug_cookie(request: Request):
     token = request.cookies.get(COOKIE_NAME)
     return PlainTextResponse(f"cookie_recebido={bool(token)}")
+@router.get("/debug-kiwify")
+def debug_kiwify():
+    import os
+    v = (os.getenv("KIWIFY_CHECKOUT_URL") or "").strip()
+    return PlainTextResponse(f"KIWIFY_CHECKOUT_URL={'OK' if v else 'VAZIO'} len={len(v)} value={v[:80]}")
+
