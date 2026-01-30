@@ -1,5 +1,3 @@
-print(">>> KIWIFY ROUTES.PY CARREGADO (versao NEVER400 v7 - ACCEPT signature + READ s1 + REAL SCALE) <<<")
-
 import os
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -13,6 +11,11 @@ from app.db.session import SessionLocal
 from app.db import models
 
 from app.payments.kiwify import is_payment_approved, extract_buyer_email
+
+DEBUG_PAYMENTS = (os.getenv("DEBUG_PAYMENTS") == "1")
+
+if DEBUG_PAYMENTS:
+    print(">>> KIWIFY ROUTES.PY CARREGADO (versao NEVER400 v7 - ACCEPT signature + READ s1 + REAL SCALE) <<<")
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -59,31 +62,38 @@ def _extract_user_id_from_payload(data: Dict[str, Any]) -> Optional[int]:
     e também aceita s1 (muito comum na Kiwify).
     """
 
-    # 0) s1 / s2 (tracking)
+    # 0) tracking.* (alguns webhooks colocam s1 aqui)
+    tracking = data.get("tracking")
+    if isinstance(tracking, dict):
+        uid = _safe_int(_pick(tracking, "s1", "s2", "s3", "s4", "s5"))
+        if uid is not None:
+            return uid
+
+    # 1) s1 / s2 (tracking no root)
     uid = _safe_int(_pick(data, "s1", "s2", "s3", "s4", "s5"))
     if uid is not None:
         return uid
 
-    # 1) nível raiz
+    # 2) nível raiz
     uid = _safe_int(_pick(data, "user_id", "customer_id", "external_id"))
     if uid is not None:
         return uid
 
-    # 2) metadata raiz
+    # 3) metadata raiz
     meta = data.get("metadata")
     if isinstance(meta, dict):
         uid = _safe_int(_pick(meta, "user_id", "customer_id", "external_id", "s1"))
         if uid is not None:
             return uid
 
-    # 3) custom_fields raiz
+    # 4) custom_fields raiz
     cf = data.get("custom_fields")
     if isinstance(cf, dict):
         uid = _safe_int(_pick(cf, "user_id", "customer_id", "external_id", "s1"))
         if uid is not None:
             return uid
 
-    # 4) order.*
+    # 5) order.*
     order = data.get("order")
     if isinstance(order, dict):
         order_cf = order.get("custom_fields")
@@ -98,7 +108,13 @@ def _extract_user_id_from_payload(data: Dict[str, Any]) -> Optional[int]:
             if uid is not None:
                 return uid
 
-    # 5) buyer.*
+        order_tracking = order.get("tracking")
+        if isinstance(order_tracking, dict):
+            uid = _safe_int(_pick(order_tracking, "s1", "s2", "s3", "s4", "s5"))
+            if uid is not None:
+                return uid
+
+    # 6) buyer.*
     buyer = data.get("buyer")
     if isinstance(buyer, dict):
         buyer_cf = buyer.get("custom_fields")
@@ -110,6 +126,12 @@ def _extract_user_id_from_payload(data: Dict[str, Any]) -> Optional[int]:
         buyer_meta = buyer.get("metadata")
         if isinstance(buyer_meta, dict):
             uid = _safe_int(_pick(buyer_meta, "user_id", "customer_id", "external_id", "s1"))
+            if uid is not None:
+                return uid
+
+        buyer_tracking = buyer.get("tracking")
+        if isinstance(buyer_tracking, dict):
+            uid = _safe_int(_pick(buyer_tracking, "s1", "s2", "s3", "s4", "s5"))
             if uid is not None:
                 return uid
 
@@ -134,7 +156,7 @@ async def kiwify_webhook(request: Request):
             request.headers.get("x-kiwify-token")
             or request.headers.get("X-Kiwify-Token")
             or request.query_params.get("token")
-            or request.query_params.get("signature")  # ✅ SEU LOG MOSTRA signature=...
+            or request.query_params.get("signature")  # ✅ aceita signature
         )
 
         if expected_token:
@@ -165,6 +187,10 @@ async def kiwify_webhook(request: Request):
 
         data = _nested(payload)
 
+        if DEBUG_PAYMENTS:
+            # cuidado: loga só quando DEBUG_PAYMENTS=1
+            print("KIWIFY_WEBHOOK >>> payload_keys=", list(payload.keys())[:30], "| data_keys=", list(data.keys())[:30])
+
         # =========================
         # 2) event_id (idempotência)
         # =========================
@@ -190,12 +216,13 @@ async def kiwify_webhook(request: Request):
         buyer_email = extract_buyer_email(data)
         buyer_email = buyer_email.strip().lower() if buyer_email else None
 
-        print(
-            "KIWIFY_WEBHOOK >>> approved",
-            "| event_id=", str(event_id),
-            "| user_id=", user_id,
-            "| email=", buyer_email,
-        )
+        if DEBUG_PAYMENTS:
+            print(
+                "KIWIFY_WEBHOOK >>> approved",
+                "| event_id=", str(event_id),
+                "| user_id=", user_id,
+                "| email=", buyer_email,
+            )
 
         # =========================
         # 5) liberar + idempotência
@@ -214,7 +241,8 @@ async def kiwify_webhook(request: Request):
                     if already:
                         return {"ok": True, "idempotent": True, "event_id": str(event_id)}
                 except Exception as e:
-                    print("KIWIFY_WEBHOOK idempotency check error (ignored):", repr(e))
+                    if DEBUG_PAYMENTS:
+                        print("KIWIFY_WEBHOOK idempotency check error (ignored):", repr(e))
 
             user = None
 
@@ -222,7 +250,7 @@ async def kiwify_webhook(request: Request):
             if user_id is not None:
                 user = db.query(models.User).filter(models.User.id == user_id).one_or_none()
 
-            # fallback email
+            # fallback email (case-insensitive)
             if user is None and buyer_email:
                 user = (
                     db.query(models.User)
@@ -240,6 +268,9 @@ async def kiwify_webhook(request: Request):
                     reason += f":email={buyer_email}"
                 else:
                     reason += ":sem_user_id_sem_email"
+
+                if DEBUG_PAYMENTS:
+                    print("KIWIFY_WEBHOOK >>>", reason, "| event_id=", str(event_id))
                 return {"ok": True, "ignored": True, "reason": reason, "event_id": str(event_id)}
 
             changed = False
@@ -264,7 +295,11 @@ async def kiwify_webhook(request: Request):
                     db.rollback()
                 except Exception as e:
                     db.rollback()
-                    print("KIWIFY_WEBHOOK event record error (ignored):", repr(e))
+                    if DEBUG_PAYMENTS:
+                        print("KIWIFY_WEBHOOK event record error (ignored):", repr(e))
+
+            if DEBUG_PAYMENTS:
+                print("KIWIFY_WEBHOOK >>> done | user_id=", user.id, "| changed=", changed, "| event_id=", str(event_id))
 
             return {
                 "ok": True,
@@ -279,9 +314,14 @@ async def kiwify_webhook(request: Request):
             db.close()
 
     except Exception as e:
-        body = await request.body()
-        print("KIWIFY_WEBHOOK ERRO:", repr(e))
-        print("KIWIFY_WEBHOOK QUERY:", dict(request.query_params))
-        print("KIWIFY_WEBHOOK HEADER x-kiwify-token:", request.headers.get("x-kiwify-token"))
-        print("KIWIFY_WEBHOOK BODY (primeiros 2000):", body.decode("utf-8", "ignore")[:2000])
+        # Nunca falha: sempre 200.
+        if DEBUG_PAYMENTS:
+            body = await request.body()
+            print("KIWIFY_WEBHOOK ERRO:", repr(e))
+            print("KIWIFY_WEBHOOK QUERY:", dict(request.query_params))
+            print("KIWIFY_WEBHOOK HEADER x-kiwify-token:", request.headers.get("x-kiwify-token"))
+            print("KIWIFY_WEBHOOK BODY (primeiros 2000):", body.decode("utf-8", "ignore")[:2000])
+        else:
+            # log mínimo sem vazar dados
+            print("KIWIFY_WEBHOOK ERRO (debug off):", repr(e))
         return {"ok": True, "ignored": True, "debug_error": str(e)}

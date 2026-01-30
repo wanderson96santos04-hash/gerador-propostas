@@ -1,5 +1,6 @@
 # backend/app/auth/routes.py
 import os  # necessário para ler KIWIFY_CHECKOUT_URL do ambiente
+from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import RedirectResponse, PlainTextResponse
@@ -57,6 +58,20 @@ def require_paid_user(request: Request, db: Session) -> User:
     if not user.is_paid:
         raise PermissionError("não pago")
     return user
+
+
+def _add_or_replace_query_params(url: str, params: dict[str, str]) -> str:
+    """
+    Adiciona/atualiza params na URL sem duplicar.
+    Mantém intacto o resto da URL.
+    """
+    if not url:
+        return url
+    parsed = urlparse(url)
+    qs = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    qs.update({k: v for k, v in params.items() if v is not None and v != ""})
+    new_query = urlencode(qs)
+    return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment))
 
 
 @router.get("/register")
@@ -176,21 +191,35 @@ def paywall(request: Request, db: Session = Depends(get_db)):
     if user.is_paid:
         return RedirectResponse(url="/create", status_code=303)
 
+    debug_payments = (os.getenv("DEBUG_PAYMENTS") == "1")
+
     checkout_url = (os.getenv("KIWIFY_CHECKOUT_URL") or "").strip()
     if not checkout_url:
         checkout_url = (getattr(settings, "kiwify_checkout_url", "") or "").strip()
 
-    # DEBUG (temporário)
-    print("PAYWALL DEBUG >>> user_id =", user.id, "| checkout_before =", checkout_url)
-
-    # ✅ Kiwify aceita s1/s2/s3 para rastreamento (vamos usar s1=user_id)
+    # ✅ Kiwify aceita s1/s2/s3 para rastreamento
+    # - s1 = user_id (preferencial e robusto)
+    # - s2 = email (fallback)
     if checkout_url:
-        sep = "&" if "?" in checkout_url else "?"
-        checkout_url = f"{checkout_url}{sep}s1={user.id}&dbg=PAYWALL_OK"
+        checkout_url = _add_or_replace_query_params(
+            checkout_url,
+            {
+                "s1": str(user.id),
+                "s2": (user.email or "").strip().lower(),
+            },
+        )
+
+    if debug_payments:
+        print("PAYWALL DEBUG >>> user_id =", user.id, "| checkout_url =", checkout_url)
 
     return request.app.state.templates.TemplateResponse(
         "paywall.html",
-        {"request": request, "user": user, "checkout_url": checkout_url},
+        {
+            "request": request,
+            "user": user,
+            "checkout_url": checkout_url,
+            "debug_payments": debug_payments,
+        },
     )
 
 
