@@ -1,4 +1,4 @@
-print(">>> KIWIFY ROUTES.PY CARREGADO (versao NEVER400 v6 - FIX PRIORITY EMAIL + USER_ID FROM PAYLOAD) <<<")
+print(">>> KIWIFY ROUTES.PY CARREGADO (versao NEVER400 v7 - ACCEPT signature + READ s1 + REAL SCALE) <<<")
 
 import os
 from datetime import datetime
@@ -26,10 +26,6 @@ def _pick(d: Dict[str, Any], *keys: str) -> Optional[Any]:
 
 
 def _nested(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Algumas integrações mandam o conteúdo dentro de 'data' ou 'payload'.
-    Se não existir, usa o payload inteiro.
-    """
     if isinstance(payload.get("data"), dict):
         return payload["data"]
     if isinstance(payload.get("payload"), dict):
@@ -38,10 +34,6 @@ def _nested(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _get_webhook_event_model():
-    """
-    WebhookEvent pode não existir / não estar migrado em produção.
-    Não pode impedir a liberação do usuário.
-    """
     return getattr(models, "WebhookEvent", None)
 
 
@@ -63,35 +55,31 @@ def _safe_int(v: Any) -> Optional[int]:
 
 def _extract_user_id_from_payload(data: Dict[str, Any]) -> Optional[int]:
     """
-    ✅ O user_id NÃO vem em request.query_params no webhook da Kiwify.
-    Se existir, ele precisa estar DENTRO do payload (custom_fields/metadata).
-
-    Tentamos vários locais comuns:
-    - data.user_id / data.customer_id
-    - data.metadata.user_id
-    - data.custom_fields.user_id
-    - data.order.custom_fields.user_id
-    - data.order.metadata.user_id
-    - data.buyer.custom_fields.user_id
-    - data.buyer.metadata.user_id
+    Tenta achar o user_id dentro do payload (custom_fields/metadata),
+    e também aceita s1 (muito comum na Kiwify).
     """
+
+    # 0) s1 / s2 (tracking)
+    uid = _safe_int(_pick(data, "s1", "s2", "s3", "s4", "s5"))
+    if uid is not None:
+        return uid
+
     # 1) nível raiz
-    direct = _pick(data, "user_id", "customer_id")
-    uid = _safe_int(direct)
+    uid = _safe_int(_pick(data, "user_id", "customer_id", "external_id"))
     if uid is not None:
         return uid
 
     # 2) metadata raiz
     meta = data.get("metadata")
     if isinstance(meta, dict):
-        uid = _safe_int(_pick(meta, "user_id", "customer_id", "external_id"))
+        uid = _safe_int(_pick(meta, "user_id", "customer_id", "external_id", "s1"))
         if uid is not None:
             return uid
 
     # 3) custom_fields raiz
     cf = data.get("custom_fields")
     if isinstance(cf, dict):
-        uid = _safe_int(_pick(cf, "user_id", "customer_id", "external_id"))
+        uid = _safe_int(_pick(cf, "user_id", "customer_id", "external_id", "s1"))
         if uid is not None:
             return uid
 
@@ -100,13 +88,13 @@ def _extract_user_id_from_payload(data: Dict[str, Any]) -> Optional[int]:
     if isinstance(order, dict):
         order_cf = order.get("custom_fields")
         if isinstance(order_cf, dict):
-            uid = _safe_int(_pick(order_cf, "user_id", "customer_id", "external_id"))
+            uid = _safe_int(_pick(order_cf, "user_id", "customer_id", "external_id", "s1"))
             if uid is not None:
                 return uid
 
         order_meta = order.get("metadata")
         if isinstance(order_meta, dict):
-            uid = _safe_int(_pick(order_meta, "user_id", "customer_id", "external_id"))
+            uid = _safe_int(_pick(order_meta, "user_id", "customer_id", "external_id", "s1"))
             if uid is not None:
                 return uid
 
@@ -115,13 +103,13 @@ def _extract_user_id_from_payload(data: Dict[str, Any]) -> Optional[int]:
     if isinstance(buyer, dict):
         buyer_cf = buyer.get("custom_fields")
         if isinstance(buyer_cf, dict):
-            uid = _safe_int(_pick(buyer_cf, "user_id", "customer_id", "external_id"))
+            uid = _safe_int(_pick(buyer_cf, "user_id", "customer_id", "external_id", "s1"))
             if uid is not None:
                 return uid
 
         buyer_meta = buyer.get("metadata")
         if isinstance(buyer_meta, dict):
-            uid = _safe_int(_pick(buyer_meta, "user_id", "customer_id", "external_id"))
+            uid = _safe_int(_pick(buyer_meta, "user_id", "customer_id", "external_id", "s1"))
             if uid is not None:
                 return uid
 
@@ -131,21 +119,14 @@ def _extract_user_id_from_payload(data: Dict[str, Any]) -> Optional[int]:
 @router.post("/kiwify")
 async def kiwify_webhook(request: Request):
     """
-    Webhook da Kiwify.
-
-    REGRA DE OURO:
-    ✅ Nunca retornar 400/500 para a Kiwify (sempre 200).
-    ✅ Se der erro, retorna 200 e registra motivo.
-
-    ✅ FIX REAL:
-    - user_id geralmente NÃO chega no webhook -> não pode depender dele
-    - primeiro tenta liberar por EMAIL (mais confiável)
-    - depois tenta por user_id (se vier no payload)
+    REGRA:
+    - nunca 400/500 (sempre 200)
+    - valida token SEM derrubar
+    - libera por user_id (payload/s1) OU fallback por email
     """
-
     try:
         # =========================
-        # 0) Validar token (sem derrubar)
+        # 0) Validar token (aceita signature também)
         # =========================
         expected_token = (os.getenv("KIWIFY_WEBHOOK_TOKEN") or "").strip()
 
@@ -153,6 +134,7 @@ async def kiwify_webhook(request: Request):
             request.headers.get("x-kiwify-token")
             or request.headers.get("X-Kiwify-Token")
             or request.query_params.get("token")
+            or request.query_params.get("signature")  # ✅ SEU LOG MOSTRA signature=...
         )
 
         if expected_token:
@@ -184,51 +166,44 @@ async def kiwify_webhook(request: Request):
         data = _nested(payload)
 
         # =========================
-        # 2) Identificar event_id (idempotência)
+        # 2) event_id (idempotência)
         # =========================
         event_id = _pick(
-            data,
-            "id",
-            "event_id",
-            "order_id",
-            "transaction_id",
-            "charge_id",
-            "sale_id",
+            data, "id", "event_id", "order_id", "transaction_id", "charge_id", "sale_id"
         )
         if not event_id:
             raw = await request.body()
             event_id = f"noid-{len(raw)}-{datetime.utcnow().isoformat()}"
 
         # =========================
-        # 3) Só processar se aprovado
+        # 3) só aprovado
         # =========================
         if not is_payment_approved(data):
             ev = _pick(data, "event", "type", "status") or "unknown"
             return {"ok": True, "ignored": True, "reason": "nao_aprovado", "event": ev}
 
         # =========================
-        # 4) Extrair email + user_id (se existir)
+        # 4) user_id real + email fallback
         # =========================
+        user_id = _extract_user_id_from_payload(data)
+
         buyer_email = extract_buyer_email(data)
         buyer_email = buyer_email.strip().lower() if buyer_email else None
-
-        user_id = _extract_user_id_from_payload(data)
 
         print(
             "KIWIFY_WEBHOOK >>> approved",
             "| event_id=", str(event_id),
-            "| email=", buyer_email,
             "| user_id=", user_id,
+            "| email=", buyer_email,
         )
 
         # =========================
-        # 5) Liberar acesso + idempotência
+        # 5) liberar + idempotência
         # =========================
         db: Session = SessionLocal()
         try:
             WebhookEvent = _get_webhook_event_model()
 
-            # 5.0) idempotência
             if WebhookEvent is not None:
                 try:
                     already = (
@@ -241,18 +216,19 @@ async def kiwify_webhook(request: Request):
                 except Exception as e:
                     print("KIWIFY_WEBHOOK idempotency check error (ignored):", repr(e))
 
-            # 5.1) achar usuário: PRIORIDADE EMAIL (webhook confiável)
             user = None
-            if buyer_email:
+
+            # prioridade user_id
+            if user_id is not None:
+                user = db.query(models.User).filter(models.User.id == user_id).one_or_none()
+
+            # fallback email
+            if user is None and buyer_email:
                 user = (
                     db.query(models.User)
                     .filter(func.lower(models.User.email) == buyer_email)
                     .one_or_none()
                 )
-
-            # 5.2) fallback por user_id (se veio no payload)
-            if user is None and user_id is not None:
-                user = db.query(models.User).filter(models.User.id == user_id).one_or_none()
 
             if not user:
                 reason = "user_nao_encontrado"
@@ -266,7 +242,6 @@ async def kiwify_webhook(request: Request):
                     reason += ":sem_user_id_sem_email"
                 return {"ok": True, "ignored": True, "reason": reason, "event_id": str(event_id)}
 
-            # 5.3) liberar
             changed = False
             if not getattr(user, "is_paid", False):
                 user.is_paid = True
@@ -276,7 +251,6 @@ async def kiwify_webhook(request: Request):
             else:
                 db.rollback()
 
-            # 5.4) registrar event
             if WebhookEvent is not None:
                 try:
                     event = WebhookEvent(
