@@ -42,21 +42,25 @@
           </div>
 
           <div style="display:flex; gap:12px; flex-wrap: wrap;">
-            {# ✅ Usa a variável de ambiente que você colocou no Render #}
-            {# Você já tem templates.env.globals["KIWIFY_CHECKOUT_URL"] no main.py #}
 
-            {% if KIWIFY_CHECKOUT_URL %}
-              <a class="btn btn-primary"
-                 href="{{ KIWIFY_CHECKOUT_URL }}"
-                 target="_blank"
-                 rel="noopener noreferrer"
-                 style="min-width: 260px; text-align:center;">
+            {# ✅ LINK REAL DO CHECKOUT (vem da rota /paywall) #}
+            {% if checkout_url %}
+              <a
+                class="btn btn-primary"
+                href="{{ checkout_url }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                style="min-width: 260px; text-align:center;"
+              >
                 Liberar acesso agora — R$ 29,90
               </a>
             {% else %}
-              <button class="btn btn-primary" disabled
-                      style="min-width: 260px; text-align:center; opacity:.6;">
-                Checkout indisponível (KIWIFY_CHECKOUT_URL vazio)
+              <button
+                class="btn btn-primary"
+                disabled
+                style="min-width: 260px; text-align:center; opacity:.6;"
+              >
+                Checkout indisponível
               </button>
             {% endif %}
 
@@ -75,7 +79,8 @@
             Quando vale a pena?
           </div>
           <p style="margin:0; line-height: 1.6;">
-            Quando o cliente pede proposta “pra hoje” e você quer responder rápido, com clareza e aparência profissional — sem travar escrevendo.
+            Quando o cliente pede proposta “pra hoje” e você quer responder rápido,
+            com clareza e aparência profissional — sem travar escrevendo.
           </p>
         </div>
 
