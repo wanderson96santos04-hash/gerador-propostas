@@ -1,8 +1,10 @@
 # backend/app/routes.py
 from __future__ import annotations
 
+import os
 from datetime import datetime
 
+import httpx
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
@@ -22,6 +24,134 @@ router = APIRouter()
 # /paywall -> definido em app/auth/routes.py (único lugar)
 # /create, /history, /proposal/* -> só pago
 # =========================
+
+
+def _env_flag(name: str, default: str = "0") -> bool:
+    v = (os.getenv(name) or default).strip().lower()
+    return v in ("1", "true", "yes", "on", "y")
+
+
+def _build_premium_prompt(data: dict) -> str:
+    """
+    Prompt Premium: GPT escreve a proposta inteira, em PT-BR, com estrutura vendável.
+    """
+    client_name = data.get("client_name", "")
+    service = data.get("service", "")
+    scope = data.get("scope", "")
+    deadline = data.get("deadline", "")
+    price = data.get("price", "")
+    payment_terms = data.get("payment_terms", "")
+    differentiators = data.get("differentiators", "")
+    warranty_support = data.get("warranty_support", "")
+    tone = data.get("tone", "")
+    objective = data.get("objective", "")
+
+    return f"""
+Você é um consultor comercial sênior e redator de propostas profissionais.
+
+Crie uma PROPOSTA COMERCIAL COMPLETA em português (PT-BR), bem formatada para copiar/colar no WhatsApp, Email ou PDF.
+O texto deve soar humano, profissional, claro e persuasivo, com linguagem fácil e objetiva.
+
+Regras:
+- Não invente dados que não existam. Se algo estiver vazio, escreva de forma genérica sem citar "não informado".
+- Use títulos e seções claras.
+- Faça uma proposta realmente "vendável": valor, benefícios, confiança, fechamento.
+- Inclua um CTA final para aprovação e início.
+- Evite exageros e promessas irreais.
+- Use tom "{tone}" e objetivo "{objective}".
+
+Dados do cliente e serviço:
+- Cliente: {client_name}
+- Serviço: {service}
+- Escopo / Inclusões: {scope}
+- Prazo: {deadline}
+- Preço / Investimento: {price}
+- Condições de pagamento: {payment_terms}
+- Diferenciais: {differentiators}
+- Garantia / Suporte: {warranty_support}
+
+Estrutura sugerida (siga isso):
+1) Abertura curta e profissional (contexto + objetivo)
+2) Entendimento do que será entregue
+3) Escopo e etapas (em bullets)
+4) Prazo e cronograma (curto)
+5) Investimento e condições de pagamento
+6) Diferenciais (por que escolher você)
+7) Garantia / suporte (se fizer sentido)
+8) Próximos passos (CTA de aprovação)
+9) Assinatura simples (sem inventar nome da empresa)
+
+Gere SOMENTE o texto final da proposta (sem comentários).
+""".strip()
+
+
+def _generate_with_openai_if_available(data: dict) -> tuple[str | None, str | None]:
+    """
+    Tenta gerar com OpenAI (Premium). Retorna (texto, debug_info).
+    Se não houver API key ou der erro, retorna (None, debug_info).
+    """
+    api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
+    if not api_key:
+        return None, "OPENAI_API_KEY ausente"
+
+    model = (os.getenv("OPENAI_MODEL") or "gpt-4o-mini").strip()
+    debug_ai = _env_flag("DEBUG_AI", "0")
+
+    prompt = _build_premium_prompt(data)
+
+    # Chat Completions (compatível e simples)
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "temperature": 0.7,
+        "messages": [
+            {
+                "role": "system",
+                "content": "Você escreve propostas comerciais profissionais, claras e persuasivas, em PT-BR.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+    }
+
+    try:
+        timeout = httpx.Timeout(25.0, connect=10.0)
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.post(url, headers=headers, json=payload)
+
+        if resp.status_code >= 400:
+            if debug_ai:
+                print("OPENAI DEBUG >>> status=", resp.status_code, "body=", resp.text[:400])
+            return None, f"OpenAI HTTP {resp.status_code}"
+
+        data_json = resp.json()
+        text = (
+            data_json.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+        )
+        text = (text or "").strip()
+
+        if debug_ai:
+            print(
+                "OPENAI DEBUG >>> ok | model=",
+                model,
+                "| chars=",
+                len(text),
+            )
+
+        if not text:
+            return None, "OpenAI retornou vazio"
+
+        return text, "OpenAI OK"
+
+    except Exception as e:
+        if debug_ai:
+            print("OPENAI DEBUG >>> exception:", repr(e))
+        return None, f"OpenAI exception: {type(e).__name__}"
 
 
 @router.get("/")
@@ -95,7 +225,26 @@ def create_action(
         "objective": (objective or "").strip().lower(),
     }
 
-    proposal_text = generate_proposal_text(data)
+    # =========================
+    # PREMIUM (GPT) com fallback
+    # =========================
+    proposal_text, ai_info = _generate_with_openai_if_available(data)
+    if not proposal_text:
+        # fallback para o gerador atual (não quebra o app)
+        proposal_text = generate_proposal_text(data)
+
+    # DEBUG opcional (não expõe secrets)
+    if _env_flag("DEBUG_AI", "0"):
+        print(
+            "PROPOSAL DEBUG >>> user_id=",
+            user.id,
+            "| ai=",
+            ai_info,
+            "| tone=",
+            data.get("tone"),
+            "| objective=",
+            data.get("objective"),
+        )
 
     summary = (
         f"Cliente: {data['client_name']}\n"
@@ -104,6 +253,7 @@ def create_action(
         f"Preço: {data['price']}\n"
         f"Pagamento: {data['payment_terms']}\n"
         f"Tom: {data['tone']} | Objetivo: {data['objective']}\n"
+        f"IA: {ai_info}\n"
     )
 
     p = Proposal(
