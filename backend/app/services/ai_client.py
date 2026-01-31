@@ -6,42 +6,6 @@ from app.config import settings
 from app.services.prompts import SYSTEM_PROMPT, build_user_prompt
 
 
-FORBIDDEN_SIGNATURE_MARKERS = [
-    "[seu nome]",
-    "[seu cargo]",
-    "[seu contato]",
-    "[nome da empresa]",
-    "[email]",
-    "[telefone]",
-]
-
-
-def _force_white_label(text: str) -> str:
-    """
-    Remove qualquer assinatura indevida gerada pelo GPT
-    e força assinatura white-label neutra.
-    """
-    lower = text.lower()
-
-    for marker in FORBIDDEN_SIGNATURE_MARKERS:
-        if marker in lower:
-            # corta tudo a partir do primeiro marcador encontrado
-            idx = lower.find(marker)
-            text = text[:idx].rstrip()
-            break
-
-    # Remove assinaturas comuns
-    for sign in ["atenciosamente,", "atenciosamente", "assinatura"]:
-        if sign in text.lower():
-            text = text[: text.lower().rfind(sign)].rstrip()
-            break
-
-    # Assinatura final FIXA
-    text += "\n\nAtenciosamente,\n\nEquipe Comercial"
-
-    return text.strip()
-
-
 def generate_with_gpt(data: Dict[str, str]) -> str:
     if not settings.openai_api_key:
         raise RuntimeError(
@@ -71,11 +35,10 @@ def generate_with_gpt(data: Dict[str, str]) -> str:
         max_tokens=1200,
     )
 
-    text = response.choices[0].message.content or ""
-    text = text.strip()
+    text = (response.choices[0].message.content or "").strip()
 
     if not text:
         raise RuntimeError("Resposta vazia da IA.")
 
-    # 🔥 PÓS-PROCESSAMENTO DEFINITIVO
-    return _force_white_label(text)
+    # Retorna texto cru; o white-label definitivo é aplicado no proposal_generator.py
+    return text

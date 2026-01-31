@@ -1,143 +1,106 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Dict
+import re
 
 from app.config import settings
 
 
-def _normalize_tone(tone: str) -> str:
-    t = (tone or "").strip().lower()
-    if t in ("formal", "direto", "amigável", "amigavel"):
-        return "amigável" if t == "amigavel" else t
-    return "direto"
+FINAL_SIGNATURE = "Atenciosamente,\nEquipe Comercial"
 
 
-def _normalize_objective(obj: str) -> str:
-    o = (obj or "").strip().lower()
-    if o in ("fechar rápido", "fechar rapido", "qualificar", "alto ticket"):
-        return "fechar rápido" if o == "fechar rapido" else o
-    return "fechar rápido"
+def sanitize_proposal_text(text: str) -> str:
+    """
+    Sanitização FINAL e obrigatória.
+    Nenhuma assinatura pessoal ou placeholder sobrevive.
+    """
 
+    if not text:
+        return FINAL_SIGNATURE
 
-def _money_hint(price: str) -> str:
-    p = (price or "").strip()
-    if not p:
-        return "a combinar"
-    return p
+    # 1) Remove QUALQUER conteúdo entre colchetes
+    text = re.sub(r"\[.*?\]", "", text, flags=re.DOTALL)
+
+    # 2) Remove tudo após qualquer variação de "Próximos passos"
+    text = re.split(
+        r"(\*\*\s*)?(##\s*)?próximos passos(\s*\*\*)?:?",
+        text,
+        flags=re.IGNORECASE
+    )[0]
+
+    # 3) Remove tentativas de assinatura ou linguagem pessoal
+    forbidden_markers = [
+        "atenciosamente",
+        "cordialmente",
+        "assinado",
+        "assine",
+        "aguardo",
+        "estou à disposição",
+        "fico à disposição",
+        "qualquer dúvida",
+        "entre em contato",
+        "emitido em",
+    ]
+
+    lower = text.lower()
+    for marker in forbidden_markers:
+        idx = lower.rfind(marker)
+        if idx != -1:
+            text = text[:idx]
+            lower = text.lower()
+
+    # 4) Limpeza visual final
+    text = text.rstrip(" \n\r-—")
+
+    # 5) Normaliza linhas em branco
+    cleaned = []
+    for line in text.splitlines():
+        line = line.rstrip()
+        if not line and cleaned and cleaned[-1] == "":
+            continue
+        cleaned.append(line)
+
+    text = "\n".join(cleaned).strip()
+
+    # 6) Encerramento neutro fixo
+    if not text:
+        return FINAL_SIGNATURE
+
+    return f"{text}\n\n{FINAL_SIGNATURE}"
 
 
 def _stub_generate(data: Dict[str, str]) -> str:
     """
-    Gerador local (sem IA). Produz uma proposta “boa o suficiente” usando regras e templates.
-    Assinatura final é neutra (white-label): 'Equipe Comercial'.
+    Stub LIMPO.
+    Não contém assinatura, placeholders ou próximos passos.
     """
-    client = data["client_name"]
-    service = data["service"]
-    scope = data.get("scope", "")
-    deadline = data.get("deadline", "")
-    price = _money_hint(data.get("price", ""))
-    payment = data.get("payment_terms", "")
-    differentiators = data.get("differentiators", "")
-    warranty = data.get("warranty_support", "")
-    tone = _normalize_tone(data.get("tone", ""))
-    objective = _normalize_objective(data.get("objective", ""))
 
-    # Ajustes de linguagem por tom
-    if tone == "formal":
-        greeting = f"Prezado(a) {client},"
-        closing = "Permaneço à disposição para quaisquer esclarecimentos."
-        call_to_action = "Caso aprove, posso iniciar imediatamente após a confirmação."
-    elif tone == "amigável":
-        greeting = f"Olá, {client}!"
-        closing = "Se quiser, eu te explico tudo rapidinho e ajusto o que precisar 🙂"
-        call_to_action = "Se fizer sentido pra você, eu já deixo tudo encaminhado pra começar."
-    else:  # direto
-        greeting = f"{client},"
-        closing = "Se estiver ok, seguimos."
-        call_to_action = "Me confirme e eu inicio."
+    service = data.get("service", "Serviço")
+    client = data.get("client_name", "")
 
-    # Ajuste por objetivo
-    if objective == "alto ticket":
-        angle = (
-            "O foco aqui é entregar um resultado acima da média, com atenção a detalhes, qualidade e previsibilidade."
-        )
-        next_step = "Próximo passo: alinhamos um briefing de 15 minutos e eu envio o cronograma final."
-    elif objective == "qualificar":
-        angle = (
-            "Antes de fechar, proponho um alinhamento rápido para confirmar prioridade, restrições e expectativas."
-        )
-        next_step = "Próximo passo: você responde 3 perguntas-chave e eu ajusto a proposta final."
-    else:  # fechar rápido
-        angle = "Proposta objetiva para você aprovar rápido e a gente começar sem enrolação."
-        next_step = "Próximo passo: aprovou, eu inicio e te envio o primeiro retorno dentro do prazo combinado."
+    greeting = f"Prezado(a) {client}," if client else "Prezado(a),"
 
-    # Campos opcionais
-    scope_block = f"\n\n**Escopo**\n{scope}" if scope else ""
-    payment_block = f"\n\n**Condições de pagamento**\n{payment}" if payment else ""
-    diff_block = f"\n\n**Diferenciais**\n{differentiators}" if differentiators else ""
-    warranty_block = f"\n\n**Garantia / Suporte**\n{warranty}" if warranty else ""
-
-    deadline_line = f"{deadline}" if deadline else "a combinar"
-
-    text = f"""# Proposta de Serviço — {service}
+    return f"""
+Proposta Comercial — {service}
 
 {greeting}
 
-Segue uma proposta para **{service}**.
-
-{angle}
-
-## Resumo
-- **Cliente:** {client}
-- **Serviço:** {service}
-- **Prazo:** {deadline_line}
-- **Investimento:** {price}
-
-{scope_block}
-
-## Entregáveis (padrão)
-- Planejamento e definição do que será feito
-- Execução do serviço conforme o escopo
-- Revisões alinhadas (para garantir que fique como você quer)
-- Entrega final organizada e pronta para uso
-
-{payment_block}
-{diff_block}
-{warranty_block}
-
-## Prazos e início
-- Início: após confirmação/aceite
-- Prazo estimado: **{deadline_line}**
-
-## Investimento
-- Valor: **{price}**
-
-## Próximos passos
-{next_step}
-
-{call_to_action}
-
-{closing}
-
-Atenciosamente,
-
-Equipe Comercial
-"""
-    return text.strip()
+Esta proposta descreve as condições gerais para a execução do serviço solicitado,
+incluindo escopo, prazos e investimento, conforme alinhado previamente.
+""".strip()
 
 
 def generate_proposal_text(data: Dict[str, str]) -> str:
     """
-    Decide se usa stub (grátis/local) ou modo GPT por variável de ambiente.
-    AI_MODE=stub (padrão) ou AI_MODE=gpt
+    Geração + sanitização FINAL centralizada.
     """
-    mode = (settings.ai_mode or "stub").strip().lower()
+
+    mode = (settings.ai_mode or "stub").lower()
 
     if mode == "gpt":
-        # Import lazy pra não quebrar o MVP se você não configurar API.
         from app.services.ai_client import generate_with_gpt
+        raw = generate_with_gpt(data)
+    else:
+        raw = _stub_generate(data)
 
-        return generate_with_gpt(data)
-
-    return _stub_generate(data)
+    return sanitize_proposal_text(raw)

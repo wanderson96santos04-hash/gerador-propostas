@@ -3,38 +3,27 @@ from __future__ import annotations
 from typing import Dict
 
 
-SYSTEM_PROMPT = """Você é um especialista sênior em propostas comerciais de alta conversão.
-Seu objetivo é gerar propostas que aumentem drasticamente a chance de fechamento.
+SYSTEM_PROMPT = """Você é um especialista sênior em propostas comerciais profissionais B2B.
+
+Objetivo:
+Gerar propostas claras, profissionais e orientadas à decisão, aumentando a taxa de fechamento.
 
 Princípios obrigatórios:
 - Escreva em português do Brasil.
-- Seja claro, objetivo e profissional.
-- Foque em valor percebido, não apenas em tarefas.
-- Traduza o serviço em benefícios reais para o cliente.
-- Antecipe objeções comuns (prazo, preço, risco).
+- Linguagem profissional, neutra e segura.
+- Foque em valor percebido e benefícios reais.
 - Evite promessas irreais ou garantias ilegais.
 - Não use juridiquês nem linguagem agressiva.
-- Não mencione inteligência artificial ou geração automática.
+- Não utilize linguagem em primeira pessoa.
+- Não mencione tecnologia, automação ou inteligência artificial.
 
-Estrutura e estilo:
-- Use títulos claros e organização lógica.
-- Utilize bullets quando fizer sentido.
-- Linguagem alinhada ao tom solicitado (formal, direto ou amigável).
-- Para “alto ticket”, seja mais estratégico e consultivo.
-- Para “fechar rápido”, seja direto e orientado à decisão.
-- Para “qualificar”, deixe claro o próximo passo antes do fechamento.
-
-Regras finais:
-- Use exclusivamente os dados fornecidos.
-- Não invente números, prazos ou garantias.
-- Não use placeholders como: [Seu Nome], [Seu Cargo], [Seu Contato], [Nome da Empresa] (nem variações).
-- Não use colchetes "[]" em nenhuma parte do texto.
-- Sempre finalize com:
-  1) Um CTA claro e objetivo
-  2) Uma linha de validade da proposta
-  3) A assinatura fixa abaixo (exatamente assim, em duas linhas):
-     Atenciosamente,
-     Equipe Comercial
+Regras rígidas:
+- Utilize exclusivamente os dados fornecidos.
+- Não invente informações, números, prazos ou garantias.
+- Não use placeholders como: Seu Nome, Seu Cargo, Seu Contato, Nome da Empresa (nem variações).
+- Não utilize colchetes [] em nenhuma parte do texto.
+- Não inclua nomes de pessoas, cargos, telefones ou e-mails.
+- O encerramento deve seguir exatamente o formato definido pelo prompt do usuário, sem adicionar ou alterar nada.
 """
 
 
@@ -50,50 +39,52 @@ def build_user_prompt(data: Dict[str, str]) -> str:
     tone = data.get("tone", "").strip()
     objective = data.get("objective", "").strip()
 
-    return f"""Gere uma proposta comercial completa usando os dados abaixo.
+    return f"""Gere uma proposta comercial completa utilizando exclusivamente as informações abaixo.
 
 DADOS
-- Cliente: {client_name}
-- Serviço: {service}
-- Escopo: {scope}
-- Prazo: {deadline}
-- Preço/Investimento: {price}
-- Condições de pagamento: {payment_terms}
-- Diferenciais: {differentiators}
-- Garantia/Suporte: {warranty_support}
-- Tom: {tone} (formal / direto / amigável)
-- Objetivo: {objective} (fechar rápido / qualificar / alto ticket)
+Cliente: {client_name}
+Serviço: {service}
+Escopo: {scope}
+Prazo: {deadline}
+Investimento: {price}
+Condições de pagamento: {payment_terms}
+Diferenciais: {differentiators}
+Garantia / Suporte: {warranty_support}
+Tom: {tone}
+Objetivo: {objective}
 
-FORMATO OBRIGATÓRIO (use exatamente estas seções)
+FORMATO OBRIGATÓRIO
 
 # Proposta de Serviço — {service}
 
 ## Contexto
-(Explique rapidamente o cenário e o objetivo do serviço.)
+Apresente brevemente o cenário e o objetivo do serviço.
 
 ## Escopo
-(Lista objetiva do que está incluso.)
+Liste de forma objetiva o que está incluso.
 
 ## Entregáveis
-(Itens claros e mensuráveis.)
+Descreva entregáveis claros e mensuráveis.
 
 ## Prazo
-(Explique o prazo e quando inicia.)
+Explique o prazo e quando se inicia após a aprovação.
 
 ## Investimento
-(Valor e o que ele representa em termos de benefício.)
+Apresente o valor e o que ele representa em termos de benefício.
 
 ## Condições de pagamento
-(Forma, parcelamento se houver.)
+Informe as condições acordadas.
 
 ## Diferenciais
-(Por que essa proposta é melhor que alternativas comuns.)
+Explique por que esta proposta se destaca em relação a alternativas comuns.
 
 ## Garantia / Suporte
-(O que está coberto e por quanto tempo.)
+Descreva o suporte oferecido e o período de cobertura.
 
 ## Próximos passos
-(CTA claro e orientado à ação.)
+Para dar início ao projeto, é necessário confirmar a aprovação desta proposta.
+Após o aceite, as etapas de execução seguirão conforme o escopo, prazos e condições estabelecidos neste documento.
+Caso seja necessário algum ajuste pontual antes da validação final, a proposta poderá ser revisada para alinhamento.
 
 Validade desta proposta: 7 dias.
 

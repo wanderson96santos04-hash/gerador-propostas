@@ -19,7 +19,34 @@
 <div class="card">
     <h3>Texto da Proposta</h3>
 
-    <textarea id="proposal_text" rows="18" readonly>{{ proposal.proposal_text }}</textarea>
+    {# 🔒 PORTÃO FINAL: corta tudo após "Próximos passos" (com variações) #}
+    {% set t = proposal.proposal_text %}
+    {% set t = t.split('Próximos passos')[0] %}
+    {% set t = t.split('Próximos Passos')[0] %}
+    {% set t = t.split('**Próximos passos**')[0] %}
+    {% set t = t.split('**Próximos Passos**')[0] %}
+    {% set t = t.split('## Próximos passos')[0] %}
+    {% set t = t.split('## Próximos Passos')[0] %}
+
+    {# 🔒 Remove placeholders mais comuns #}
+    {% set t = t
+        | replace('[Seu Nome]', '')
+        | replace('[Seu Contato]', '')
+        | replace('[Seu Cargo]', '')
+        | replace('[Telefone]', '')
+        | replace('[telefone]', '')
+        | replace('[E-mail]', '')
+        | replace('[e-mail]', '')
+        | replace('[Email]', '')
+        | replace('[email]', '')
+        | replace('[Nome da Empresa]', '')
+        | replace('[nome da empresa]', '')
+    %}
+
+    {# 🔒 Força encerramento fixo #}
+    {% set t = t.strip() ~ "\n\nAtenciosamente,\nEquipe Comercial" %}
+
+    <textarea id="proposal_text" rows="18" readonly>{{ t }}</textarea>
 
     <p class="muted">Clique no texto acima para selecionar e copiar, ou use o botão.</p>
 
