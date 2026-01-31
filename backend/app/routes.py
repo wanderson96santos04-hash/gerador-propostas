@@ -18,57 +18,80 @@ from app.pdf.render_pdf import build_proposal_pdf
 
 router = APIRouter()
 
+# ✅ DIAGNÓSTICO (reversível): confirma que o Render está rodando ESTE arquivo
+ROUTES_VERSION = "routes_v_input_summary_fix_2026-01-31"
+
 FINAL_SIGNATURE = "Atenciosamente,\nEquipe Comercial"
 
 
-def _env_flag(name: str, default: str = "0") -> bool:
-    v = (os.getenv(name) or default).strip().lower()
-    return v in ("1", "true", "yes", "on", "y")
+@router.get("/__routes_whoami")
+def routes_whoami():
+    return {"file": __file__, "version": ROUTES_VERSION}
+
+
+def _redirect_paywall() -> RedirectResponse:
+    # 303 garante GET no destino (bom para evitar re-POST)
+    return RedirectResponse("/paywall", status_code=303)
 
 
 def _sanitize_proposal_text(text: str) -> str:
     """
-    SANITIZAÇÃO FINAL DEFINITIVA.
-    Nada de assinatura pessoal, placeholders ou texto após 'Próximos passos'.
+    Blindagem DEFINITIVA:
+    - Remove qualquer coisa entre colchetes [ ... ]
+    - Remove tudo após "Próximos passos" (qualquer variação)
+    - Remove fechos pessoais
+    - Força encerramento fixo
     """
     if not text:
         return FINAL_SIGNATURE
 
-    t = text.strip()
+    t = (text or "").strip()
 
-    # 1) Remove QUALQUER coisa entre colchetes [ ... ]
-    t = re.sub(r"\[.*?\]", "", t, flags=re.DOTALL)
+    # 1) remove QUALQUER coisa entre colchetes
+    t = re.sub(r"\[.*?\]", "", t, flags=re.DOTALL).strip()
 
-    # 2) REMOVE TUDO após qualquer variação de "Próximos passos"
+    # 2) corta tudo após "Próximos passos" (variações)
     t = re.split(
-        r"(?is)(\*\*\s*)?(##\s*)?próximos passos(\s*\*\*)?:?",
+        r"(?is)(\*\*próximos passos\*\*|##\s*próximos passos|próximos passos)",
         t,
-    )[0]
+        maxsplit=1,
+    )[0].strip()
 
-    # 3) Remove qualquer tentativa de assinatura ou linguagem pessoal restante
+    # 3) remove assinaturas/fechos pessoais caso tenham sobrado
     t = re.sub(
-        r"(?is)\b("
-        r"atenciosamente|cordialmente|assinado|assine|"
-        r"aguardo|aguardamos|peço|podemos|"
-        r"estou à disposição|estamos à disposição|"
-        r"fico à disposição|qualquer dúvida|"
-        r"entre em contato|emitido em"
-        r").*$",
+        r"(?is)\b(atenciosamente|aguardo|aguardamos|peço|podemos|estamos à disposição|fico à disposição).*?$",
         "",
         t,
     ).strip()
 
-    # 4) Limpeza visual final
-    t = t.rstrip(" \n\r-—")
-
-    # 5) Normaliza linhas em branco
+    # 4) limpa excesso de linhas
     t = re.sub(r"\n{3,}", "\n\n", t).strip()
 
-    # 6) Encerramento FIXO e IMUTÁVEL
     if not t:
         return FINAL_SIGNATURE
 
-    return f"{t}\n\n{FINAL_SIGNATURE}"
+    return f"{t}\n\n{FINAL_SIGNATURE}".strip()
+
+
+def _build_input_summary(data: dict) -> str:
+    """
+    input_summary é NOT NULL no Postgres (Render).
+    Aqui GARANTE string SEMPRE.
+    """
+    client = (data.get("client_name") or "").strip()
+    service = (data.get("service") or "").strip()
+    scope = (data.get("scope") or "").strip()
+    price = (data.get("price") or "").strip()
+    deadline = (data.get("deadline") or "").strip()
+    tone = (data.get("tone") or "").strip()
+    objective = (data.get("objective") or "").strip()
+
+    summary = (
+        f"Cliente: {client} | Serviço: {service} | Escopo: {scope} | Valor: {price} | "
+        f"Prazo: {deadline} | Tom: {tone} | Objetivo: {objective}"
+    ).strip()
+
+    return summary if summary else "Resumo indisponível"
 
 
 def _build_premium_prompt(data: dict) -> str:
@@ -78,14 +101,14 @@ Você é um redator sênior de propostas comerciais profissionais.
 Crie uma PROPOSTA COMERCIAL COMPLETA em português (PT-BR), clara, objetiva e profissional.
 
 REGRAS ABSOLUTAS:
-- Não utilize colchetes "[]".
+- Não utilize colchetes.
 - Não utilize placeholders.
 - Não use linguagem em primeira pessoa.
 - Não inclua nomes, cargos, telefones, e-mails ou empresa.
 - NÃO crie assinatura pessoal.
 - NÃO escreva nada após o encerramento.
 
-ENCERRAMENTO OBRIGATÓRIO (termine exatamente assim):
+ENCERRAMENTO OBRIGATÓRIO:
 Atenciosamente,
 Equipe Comercial
 
@@ -157,7 +180,11 @@ def home(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/create")
 def create_page(request: Request, db: Session = Depends(get_db)):
-    require_paid_user(request, db)
+    try:
+        require_paid_user(request, db)
+    except PermissionError:
+        return _redirect_paywall()
+
     return request.app.state.templates.TemplateResponse(
         "create_proposal.html",
         {"request": request},
@@ -179,28 +206,36 @@ def create_action(
     objective: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    user = require_paid_user(request, db)
+    try:
+        user = require_paid_user(request, db)
+    except PermissionError:
+        return _redirect_paywall()
 
     data = {
-        "client_name": client_name.strip(),
-        "service": service.strip(),
-        "scope": scope.strip(),
-        "deadline": deadline.strip(),
-        "price": price.strip(),
-        "payment_terms": payment_terms.strip(),
-        "differentiators": differentiators.strip(),
-        "warranty_support": warranty_support.strip(),
-        "tone": tone.strip().lower(),
-        "objective": objective.strip().lower(),
+        "client_name": (client_name or "").strip(),
+        "service": (service or "").strip(),
+        "scope": (scope or "").strip(),
+        "deadline": (deadline or "").strip(),
+        "price": (price or "").strip(),
+        "payment_terms": (payment_terms or "").strip(),
+        "differentiators": (differentiators or "").strip(),
+        "warranty_support": (warranty_support or "").strip(),
+        "tone": (tone or "").strip().lower(),
+        "objective": (objective or "").strip().lower(),
     }
 
+    # gera texto
     text = _generate_with_openai_if_available(data)
     if not text:
         text = generate_proposal_text(data)
 
-    # 🔒 SANITIZAÇÃO FINAL (ÚLTIMO PASSO DO FLUXO)
+    # 🔒 sanitiza antes de salvar
     text = _sanitize_proposal_text(text)
 
+    # ✅ gera input_summary obrigatório (NOT NULL)
+    input_summary = _build_input_summary(data)
+
+    # cria proposta (✅ já passa input_summary no construtor)
     p = Proposal(
         user_id=user.id,
         client_name=data["client_name"],
@@ -209,23 +244,38 @@ def create_action(
         deadline=data["deadline"],
         tone=data["tone"],
         objective=data["objective"],
+        input_summary=input_summary,
         proposal_text=text,
         created_at=datetime.utcnow(),
     )
+
+    # ✅ BLINDAGEM EXTRA (se o model mudar depois, ainda garante)
+    if hasattr(p, "input_summary"):
+        setattr(p, "input_summary", getattr(p, "input_summary", None) or "Resumo indisponível")
 
     db.add(p)
     db.commit()
     db.refresh(p)
 
+    created_date = ""
+    try:
+        if p.created_at:
+            created_date = p.created_at.strftime("%d/%m/%Y")
+    except Exception:
+        created_date = str(p.created_at) if p.created_at else ""
+
     return request.app.state.templates.TemplateResponse(
         "result.html",
-        {"request": request, "proposal": p},
+        {"request": request, "proposal": p, "created_date": created_date},
     )
 
 
 @router.get("/proposal/{proposal_id}/pdf")
 def proposal_pdf(proposal_id: int, request: Request, db: Session = Depends(get_db)):
-    user = require_paid_user(request, db)
+    try:
+        user = require_paid_user(request, db)
+    except PermissionError:
+        return _redirect_paywall()
 
     p = (
         db.query(Proposal)
