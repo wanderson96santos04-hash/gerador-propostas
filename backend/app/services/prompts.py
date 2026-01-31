@@ -27,9 +27,14 @@ Estrutura e estilo:
 Regras finais:
 - Use exclusivamente os dados fornecidos.
 - Não invente números, prazos ou garantias.
+- Não use placeholders como: [Seu Nome], [Seu Cargo], [Seu Contato], [Nome da Empresa] (nem variações).
+- Não use colchetes "[]" em nenhuma parte do texto.
 - Sempre finalize com:
   1) Um CTA claro e objetivo
   2) Uma linha de validade da proposta
+  3) A assinatura fixa abaixo (exatamente assim, em duas linhas):
+     Atenciosamente,
+     Equipe Comercial
 """
 
 
@@ -91,4 +96,7 @@ FORMATO OBRIGATÓRIO (use exatamente estas seções)
 (CTA claro e orientado à ação.)
 
 Validade desta proposta: 7 dias.
+
+Atenciosamente,
+Equipe Comercial
 """
