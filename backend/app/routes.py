@@ -18,15 +18,7 @@ from app.pdf.render_pdf import build_proposal_pdf
 
 router = APIRouter()
 
-# ✅ DIAGNÓSTICO (reversível): confirma que o Render está rodando ESTE arquivo
-ROUTES_VERSION = "routes_v_input_summary_fix_2026-01-31"
-
 FINAL_SIGNATURE = "Atenciosamente,\nEquipe Comercial"
-
-
-@router.get("/__routes_whoami")
-def routes_whoami():
-    return {"file": __file__, "version": ROUTES_VERSION}
 
 
 def _redirect_paywall() -> RedirectResponse:
