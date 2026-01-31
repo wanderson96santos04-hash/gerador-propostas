@@ -30,6 +30,7 @@ def _money_hint(price: str) -> str:
 def _stub_generate(data: Dict[str, str]) -> str:
     """
     Gerador local (sem IA). Produz uma proposta “boa o suficiente” usando regras e templates.
+    Assinatura final é neutra (white-label): 'Equipe Comercial'.
     """
     client = data["client_name"]
     service = data["service"]
@@ -119,7 +120,9 @@ Segue uma proposta para **{service}**.
 
 {closing}
 
-— Gerado em {datetime.now().strftime("%d/%m/%Y %H:%M")}
+Atenciosamente,
+
+Equipe Comercial
 """
     return text.strip()
 
