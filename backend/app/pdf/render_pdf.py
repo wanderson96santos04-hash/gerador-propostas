@@ -1,7 +1,4 @@
-from __future__ import annotations
-
-from typing import Optional
-
+from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
@@ -12,14 +9,13 @@ from reportlab.lib.colors import black
 
 
 def build_proposal_pdf(
-    file_path: str,
     client_name: str,
     service: str,
     price: str,
     proposal_text: str,
-    title: Optional[str] = None,  # ✅ aceita "title" sem quebrar nada
-):
-    c = canvas.Canvas(file_path, pagesize=A4)
+) -> bytes:
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
     styles = getSampleStyleSheet()
@@ -33,10 +29,7 @@ def build_proposal_pdf(
     y = height - 2 * cm
 
     c.setFont("Helvetica-Bold", 18)
-
-    # ✅ Se vier title, usa; senão mantém o padrão
-    header_title = (title or "Proposta Comercial").strip() or "Proposta Comercial"
-    c.drawString(2 * cm, y, header_title)
+    c.drawString(2 * cm, y, "Proposta Comercial")
     y -= 1 * cm
 
     c.setFont("Helvetica", 11)
@@ -49,7 +42,7 @@ def build_proposal_pdf(
     c.drawString(2 * cm, y, f"Investimento: {price}")
     y -= 1.2 * cm
 
-    # ===== CORPO DA PROPOSTA =====
+    # ===== CORPO =====
     frame = Frame(
         2 * cm,
         2 * cm,
@@ -69,3 +62,6 @@ def build_proposal_pdf(
 
     c.showPage()
     c.save()
+
+    buffer.seek(0)
+    return buffer.read()
