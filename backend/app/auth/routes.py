@@ -219,6 +219,8 @@ def paywall(request: Request, db: Session = Depends(get_db)):
             "user": user,
             "checkout_url": checkout_url,
             "debug_payments": debug_payments,
+            # ✅ TROCA AQUI (sem mexer no resto)
+            "paywall_price_brl": (os.getenv("PAYWALL_PRICE_BRL") or getattr(settings, "paywall_price_brl", "") or "29,90").strip(),
         },
     )
 

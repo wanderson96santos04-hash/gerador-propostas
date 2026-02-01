@@ -2,6 +2,9 @@
 {% extends "base.html" %}
 {% block content %}
 
+{# Preço com fallback seguro: se não vier do backend, mantém 29,90 #}
+{% set _price = paywall_price_brl if paywall_price_brl is defined and paywall_price_brl else "29,90" %}
+
 <div class="page">
   <div class="container">
     <div class="card">
@@ -50,7 +53,7 @@
           </div>
 
           <div style="font-size: 44px; font-weight: 800; margin: 8px 0 14px 0;">
-            R$ 29,90
+            R$ {{ _price }}
           </div>
 
           <div style="display:flex; gap:12px; flex-wrap: wrap;">
@@ -61,7 +64,7 @@
                  target="_blank"
                  rel="noopener noreferrer"
                  style="min-width: 260px; text-align:center;">
-                Liberar acesso agora — R$ 29,90
+                Liberar acesso agora — R$ {{ _price }}
               </a>
             {% else %}
               <button class="btn btn-primary" disabled
