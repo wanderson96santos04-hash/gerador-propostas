@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Optional
+
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
@@ -13,6 +17,7 @@ def build_proposal_pdf(
     service: str,
     price: str,
     proposal_text: str,
+    title: Optional[str] = None,  # ✅ aceita "title" sem quebrar nada
 ):
     c = canvas.Canvas(file_path, pagesize=A4)
     width, height = A4
@@ -28,7 +33,10 @@ def build_proposal_pdf(
     y = height - 2 * cm
 
     c.setFont("Helvetica-Bold", 18)
-    c.drawString(2 * cm, y, "Proposta Comercial")
+
+    # ✅ Se vier title, usa; senão mantém o padrão
+    header_title = (title or "Proposta Comercial").strip() or "Proposta Comercial"
+    c.drawString(2 * cm, y, header_title)
     y -= 1 * cm
 
     c.setFont("Helvetica", 11)
