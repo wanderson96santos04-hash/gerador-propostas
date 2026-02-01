@@ -27,17 +27,22 @@ def _redirect_paywall() -> RedirectResponse:
 
 
 def _sanitize_proposal_text(text: str) -> str:
+    print("### SANITIZE EXECUTOU ###")
     """
     Blindagem DEFINITIVA:
     - Remove qualquer coisa entre colchetes [ ... ]
     - Remove tudo após "Próximos passos" (qualquer variação)
     - Remove fechos pessoais
-    - Força encerramento fixo
+    - Remove QUALQUER assinatura existente (inclusive duplicada)
+    - Garante UMA assinatura final fixa (sem duplicar)
     """
     if not text:
         return FINAL_SIGNATURE
 
     t = (text or "").strip()
+
+    # ✅ normaliza quebras de linha do Windows
+    t = t.replace("\r\n", "\n").replace("\r", "\n").strip()
 
     # 1) remove QUALQUER coisa entre colchetes
     t = re.sub(r"\[.*?\]", "", t, flags=re.DOTALL).strip()
@@ -49,19 +54,42 @@ def _sanitize_proposal_text(text: str) -> str:
         maxsplit=1,
     )[0].strip()
 
-    # 3) remove assinaturas/fechos pessoais caso tenham sobrado
+    # 3) remove fechos pessoais comuns (sem matar o texto inteiro por engano)
     t = re.sub(
-        r"(?is)\b(atenciosamente|aguardo|aguardamos|peço|podemos|estamos à disposição|fico à disposição).*?$",
+        r"(?is)\b(aguardo|aguardamos|peço|podemos|estamos à disposição|fico à disposição).*?$",
         "",
         t,
     ).strip()
 
-    # 4) limpa excesso de linhas
+    # 4) remove APENAS blocos de assinatura no FINAL (robusto e sem "comer" o corpo)
+    #    - aceita variações: caixa, vírgula/dois pontos/hífen, espaços, linhas em branco
+    #    - remove repetições 2+ vezes
+    #    - também remove casos onde só sobrou "Equipe Comercial" no fim
+    sig_end_pattern = (
+        r"(?is)"
+        r"(?:\n\s*)*"
+        r"(?:"
+        r"(?:atenciosamente\s*[,:\-]?\s*(?:\n\s*)*equipe\s+comercial\.?\s*)"
+        r"|"
+        r"(?:equipe\s+comercial\.?\s*)"
+        r")"
+        r"(?:\n\s*)*$"
+    )
+
+    # remove repetidamente até não haver mais assinatura no fim
+    while True:
+        new_t = re.sub(sig_end_pattern, "", t).strip()
+        if new_t == t:
+            break
+        t = new_t
+
+    # 5) limpa excesso de linhas
     t = re.sub(r"\n{3,}", "\n\n", t).strip()
 
     if not t:
         return FINAL_SIGNATURE
 
+    # ✅ garante uma única assinatura final
     return f"{t}\n\n{FINAL_SIGNATURE}".strip()
 
 
