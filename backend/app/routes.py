@@ -10,11 +10,15 @@ from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
+from app.config import settings  # ✅ ADIÇÃO SEGURA: apenas lê variáveis do .env/Render
 from app.db.session import get_db
 from app.db.models import Proposal
 from app.auth.routes import get_current_user, require_paid_user
 from app.services.proposal_generator import generate_proposal_text
 from app.pdf.render_pdf import build_proposal_pdf
+
+# ✅ NOVO: presets inteligentes (1 clique)
+from app.templates.intelligent_presets import PRESETS
 
 router = APIRouter()
 
@@ -27,7 +31,6 @@ def _redirect_paywall() -> RedirectResponse:
 
 
 def _sanitize_proposal_text(text: str) -> str:
-    print("### SANITIZE EXECUTOU ###")
     """
     Blindagem DEFINITIVA:
     - Remove qualquer coisa entre colchetes [ ... ]
@@ -39,10 +42,11 @@ def _sanitize_proposal_text(text: str) -> str:
     if not text:
         return FINAL_SIGNATURE
 
-    t = (text or "").strip()
+    t = (text or "")
 
-    # ✅ normaliza quebras de linha do Windows
-    t = t.replace("\r\n", "\n").replace("\r", "\n").strip()
+    # ✅ normaliza quebras de linha + NBSP (espaço invisível)
+    t = t.replace("\r\n", "\n").replace("\r", "\n")
+    t = t.replace("\u00a0", " ").strip()
 
     # 1) remove QUALQUER coisa entre colchetes
     t = re.sub(r"\[.*?\]", "", t, flags=re.DOTALL).strip()
@@ -61,27 +65,55 @@ def _sanitize_proposal_text(text: str) -> str:
         t,
     ).strip()
 
-    # 4) remove APENAS blocos de assinatura no FINAL (robusto e sem "comer" o corpo)
-    #    - aceita variações: caixa, vírgula/dois pontos/hífen, espaços, linhas em branco
-    #    - remove repetições 2+ vezes
-    #    - também remove casos onde só sobrou "Equipe Comercial" no fim
-    sig_end_pattern = (
-        r"(?is)"
-        r"(?:\n\s*)*"
-        r"(?:"
-        r"(?:atenciosamente\s*[,:\-]?\s*(?:\n\s*)*equipe\s+comercial\.?\s*)"
-        r"|"
-        r"(?:equipe\s+comercial\.?\s*)"
-        r")"
-        r"(?:\n\s*)*$"
-    )
+    # 4) REMOÇÃO DEFINITIVA: remove assinaturas repetidas SOMENTE no FINAL (por linhas)
+    def _norm(s: str) -> str:
+        s = (s or "").replace("\u00a0", " ").strip().lower()
+        s = re.sub(r"\s+", " ", s)
+        return s
 
-    # remove repetidamente até não haver mais assinatura no fim
+    lines = t.split("\n")
+
+    def _pop_blank_end():
+        while lines and _norm(lines[-1]) == "":
+            lines.pop()
+
+    def _is_atenciosamente(line: str) -> bool:
+        return re.fullmatch(r"atenciosamente\s*[,:\-]?", _norm(line)) is not None
+
+    def _is_equipe(line: str) -> bool:
+        return re.fullmatch(r"equipe comercial\.?", _norm(line)) is not None
+
+    def _is_both(line: str) -> bool:
+        return re.fullmatch(
+            r"atenciosamente\s*[,:\-]?\s*equipe comercial\.?",
+            _norm(line),
+        ) is not None
+
+    _pop_blank_end()
+
     while True:
-        new_t = re.sub(sig_end_pattern, "", t).strip()
-        if new_t == t:
+        _pop_blank_end()
+        if not lines:
             break
-        t = new_t
+
+        if _is_both(lines[-1]):
+            lines.pop()
+            continue
+
+        if _is_equipe(lines[-1]):
+            lines.pop()
+            _pop_blank_end()
+            if lines and _is_atenciosamente(lines[-1]):
+                lines.pop()
+            continue
+
+        if _is_atenciosamente(lines[-1]):
+            lines.pop()
+            continue
+
+        break
+
+    t = "\n".join(lines).strip()
 
     # 5) limpa excesso de linhas
     t = re.sub(r"\n{3,}", "\n\n", t).strip()
@@ -89,7 +121,7 @@ def _sanitize_proposal_text(text: str) -> str:
     if not t:
         return FINAL_SIGNATURE
 
-    # ✅ garante uma única assinatura final
+    # ✅ garante UMA única assinatura final
     return f"{t}\n\n{FINAL_SIGNATURE}".strip()
 
 
@@ -211,6 +243,19 @@ def create_page(request: Request, db: Session = Depends(get_db)):
     )
 
 
+# ✅ NOVO: lista presets (para UI de 1 clique)
+@router.get("/presets")
+def list_presets(request: Request, db: Session = Depends(get_db)):
+    try:
+        require_paid_user(request, db)
+    except PermissionError:
+        return {"presets": []}
+
+    return {
+        "presets": [{"id": k, "label": v.get("label", k)} for k, v in PRESETS.items()]
+    }
+
+
 @router.post("/create")
 def create_action(
     request: Request,
@@ -224,6 +269,8 @@ def create_action(
     warranty_support: str = Form(...),
     tone: str = Form(...),
     objective: str = Form(...),
+    # ✅ NOVO: preset_id opcional (1 clique)
+    preset_id: str = Form(None),
     db: Session = Depends(get_db),
 ):
     try:
@@ -244,18 +291,29 @@ def create_action(
         "objective": (objective or "").strip().lower(),
     }
 
-    # gera texto
+    # ✅ aplica preset (1 clique) se veio preset_id
+    preset_id_clean = (preset_id or "").strip()
+    if preset_id_clean and preset_id_clean in PRESETS:
+        preset = PRESETS[preset_id_clean]
+
+        # Preenche apenas se o usuário deixou vazio (não sobrescreve)
+        if not data["service"]:
+            data["service"] = (preset.get("service") or "").strip()
+        if not data["scope"]:
+            data["scope"] = (preset.get("scope") or "").strip()
+        if not data["differentiators"]:
+            data["differentiators"] = (preset.get("differentiators") or "").strip()
+        if not data["warranty_support"]:
+            data["warranty_support"] = (preset.get("warranty_support") or "").strip()
+
     text = _generate_with_openai_if_available(data)
     if not text:
         text = generate_proposal_text(data)
 
-    # 🔒 sanitiza antes de salvar
     text = _sanitize_proposal_text(text)
 
-    # ✅ gera input_summary obrigatório (NOT NULL)
     input_summary = _build_input_summary(data)
 
-    # cria proposta (✅ já passa input_summary no construtor)
     p = Proposal(
         user_id=user.id,
         client_name=data["client_name"],
@@ -269,7 +327,6 @@ def create_action(
         created_at=datetime.utcnow(),
     )
 
-    # ✅ BLINDAGEM EXTRA (se o model mudar depois, ainda garante)
     if hasattr(p, "input_summary"):
         setattr(p, "input_summary", getattr(p, "input_summary", None) or "Resumo indisponível")
 

@@ -1,12 +1,82 @@
 {% extends "base.html" %}
 
 {% block content %}
+
+<style>
+/* ===== ESTILO PREMIUM DOS CARDS ===== */
+.preset-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.preset-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 18px;
+    background: #ffffff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.preset-card:hover {
+    border-color: #2563eb;
+    box-shadow: 0 8px 24px rgba(37,99,235,0.15);
+    transform: translateY(-3px);
+}
+
+.preset-card h4 {
+    margin: 0 0 6px 0;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.preset-card p {
+    margin: 0 0 10px 0;
+    font-size: 13px;
+    color: #4b5563;
+    line-height: 1.4;
+}
+
+.preset-card span {
+    font-size: 11px;
+    font-weight: 600;
+    color: #2563eb;
+    background: #eff6ff;
+    padding: 4px 10px;
+    border-radius: 999px;
+    display: inline-block;
+}
+</style>
+
 <h2>Criar Proposta</h2>
 
 {% if error %}
     <div class="error">{{ error }}</div>
 {% endif %}
 
+<!-- ===== CARDS DE MODELOS (1 CLIQUE) ===== -->
+<h3>Escolha um modelo de proposta</h3>
+
+<div class="preset-cards">
+
+    <div class="preset-card" onclick="applyPreset('social')">
+        <h4>Social Media Premium</h4>
+        <p>Contrato mensal focado em vendas</p>
+        <span>1 clique</span>
+    </div>
+
+    <div class="preset-card" onclick="applyPreset('site')">
+        <h4>Criação de Site</h4>
+        <p>Projeto fechado com prazo definido</p>
+        <span>1 clique</span>
+    </div>
+
+</div>
+
+<!-- ===== FORMULÁRIO (NÃO QUEBRADO) ===== -->
 <form method="post" action="/create" class="card">
 
     <h3>Dados do Cliente</h3>
@@ -18,41 +88,64 @@
 
     <label>
         Serviço
-        <input type="text" name="service" required>
+        <input
+            type="text"
+            name="service"
+            value="Gestão de Social Media Premium"
+            required
+        >
     </label>
 
     <h3>Detalhes do Serviço</h3>
 
     <label>
         Escopo do serviço
-        <textarea name="scope" rows="4" placeholder="Descreva o que está incluso"></textarea>
+        <textarea name="scope" rows="4">
+Planejamento estratégico, criação de conteúdo, gestão de redes sociais e acompanhamento mensal focado em vendas.
+        </textarea>
     </label>
 
     <label>
         Prazo
-        <input type="text" name="deadline" placeholder="Ex: 7 dias, até 30/01">
+        <input
+            type="text"
+            name="deadline"
+            value="Contrato mensal"
+        >
     </label>
 
     <label>
         Preço / Investimento
-        <input type="text" name="price" placeholder="Ex: R$ 1.500">
+        <input
+            type="text"
+            name="price"
+            value="R$ 1.500 / mês"
+        >
     </label>
 
     <label>
         Condições de pagamento
-        <input type="text" name="payment_terms" placeholder="Ex: 50% entrada, 50% na entrega">
+        <input
+            type="text"
+            name="payment_terms"
+            value="Mensalidade antecipada"
+        >
     </label>
 
     <h3>Argumentos de Venda</h3>
 
     <label>
         Diferenciais
-        <textarea name="differentiators" rows="3" placeholder="Por que você é a melhor opção?"></textarea>
+        <textarea name="differentiators" rows="3">
+Estratégia focada em conversão, conteúdo profissional e acompanhamento próximo dos resultados.
+        </textarea>
     </label>
 
     <label>
         Garantia / Suporte
-        <textarea name="warranty_support" rows="3" placeholder="Ex: suporte por 7 dias após entrega"></textarea>
+        <textarea name="warranty_support" rows="3">
+Suporte contínuo durante o contrato e ajustes estratégicos conforme desempenho.
+        </textarea>
     </label>
 
     <h3>Estilo da Proposta</h3>
@@ -60,7 +153,7 @@
     <label>
         Tom da comunicação
         <select name="tone">
-            <option value="direto">Direto</option>
+            <option value="direto" selected>Direto</option>
             <option value="formal">Formal</option>
             <option value="amigável">Amigável</option>
         </select>
@@ -69,7 +162,7 @@
     <label>
         Objetivo da proposta
         <select name="objective">
-            <option value="fechar rápido">Fechar rápido</option>
+            <option value="fechar rápido" selected>Fechar rápido</option>
             <option value="qualificar">Qualificar</option>
             <option value="alto ticket">Alto ticket</option>
         </select>
@@ -78,4 +171,46 @@
     <button type="submit">Gerar Proposta</button>
 
 </form>
+
+<!-- ===== SCRIPT DOS CARDS ===== -->
+<script>
+function applyPreset(type) {
+
+    if (type === 'social') {
+        document.querySelector('[name="service"]').value =
+            'Gestão de Social Media Premium';
+
+        document.querySelector('[name="scope"]').value =
+            'Planejamento estratégico, criação de conteúdo, gestão de redes sociais e acompanhamento mensal focado em vendas.';
+
+        document.querySelector('[name="deadline"]').value =
+            'Contrato mensal';
+
+        document.querySelector('[name="price"]').value =
+            'R$ 1.500 / mês';
+
+        document.querySelector('[name="payment_terms"]').value =
+            'Mensalidade antecipada';
+    }
+
+    if (type === 'site') {
+        document.querySelector('[name="service"]').value =
+            'Criação de Site Profissional';
+
+        document.querySelector('[name="scope"]').value =
+            'Desenvolvimento de site responsivo, rápido e otimizado para conversão.';
+
+        document.querySelector('[name="deadline"]').value =
+            '15 dias';
+
+        document.querySelector('[name="price"]').value =
+            'R$ 2.500';
+
+        document.querySelector('[name="payment_terms"]').value =
+            '50% na entrada + 50% na entrega';
+    }
+
+}
+</script>
+
 {% endblock %}
