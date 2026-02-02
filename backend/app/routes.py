@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import re
+import logging
 from datetime import datetime
 
 import httpx
@@ -23,103 +24,168 @@ router = APIRouter()
 
 FINAL_SIGNATURE = "Atenciosamente,\nEquipe Comercial"
 
+logger = logging.getLogger(__name__)
+
+
 # ======================================================
 # Helpers
 # ======================================================
 
-def _redirect_paywall():
+def _redirect_paywall() -> RedirectResponse:
     return RedirectResponse("/paywall", status_code=303)
 
 
 def _sanitize_proposal_text(text: str) -> str:
+    """
+    Sanitização final:
+    - remove [ ... ]
+    - remove tudo após "Próximos passos"
+    - remove assinaturas duplicadas
+    - garante assinatura final fixa
+    """
     if not text:
         return FINAL_SIGNATURE
 
-    t = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+    t = (text or "")
+    t = t.replace("\r\n", "\n").replace("\r", "\n").replace("\u00a0", " ").strip()
 
     # remove colchetes
-    t = re.sub(r"\[.*?\]", "", t, flags=re.DOTALL)
+    t = re.sub(r"\[.*?\]", "", t, flags=re.DOTALL).strip()
 
     # remove tudo após "próximos passos"
     t = re.split(
-        r"(?is)(próximos passos|##\s*próximos passos|\*\*próximos passos\*\*)",
+        r"(?is)(\*\*próximos passos\*\*|##\s*próximos passos|próximos passos)",
         t,
         maxsplit=1,
     )[0].strip()
 
-    # remove assinaturas existentes
+    # remove assinaturas no final
+    def _norm(s: str) -> str:
+        s = (s or "").replace("\u00a0", " ").strip().lower()
+        s = re.sub(r"\s+", " ", s)
+        return s
+
     lines = t.split("\n")
 
-    def norm(s: str) -> str:
-        return re.sub(r"\s+", " ", s.lower().strip())
+    def _pop_blank_end():
+        while lines and _norm(lines[-1]) == "":
+            lines.pop()
 
-    while lines and norm(lines[-1]) in {
-        "atenciosamente",
-        "equipe comercial",
-        "atenciosamente equipe comercial",
-    }:
-        lines.pop()
+    def _is_atenciosamente(line: str) -> bool:
+        return re.fullmatch(r"atenciosamente\s*[,:\-]?", _norm(line)) is not None
+
+    def _is_equipe(line: str) -> bool:
+        return re.fullmatch(r"equipe comercial\.?", _norm(line)) is not None
+
+    def _is_both(line: str) -> bool:
+        return re.fullmatch(
+            r"atenciosamente\s*[,:\-]?\s*equipe comercial\.?",
+            _norm(line),
+        ) is not None
+
+    _pop_blank_end()
+
+    while True:
+        _pop_blank_end()
+        if not lines:
+            break
+
+        if _is_both(lines[-1]):
+            lines.pop()
+            continue
+
+        if _is_equipe(lines[-1]):
+            lines.pop()
+            _pop_blank_end()
+            if lines and _is_atenciosamente(lines[-1]):
+                lines.pop()
+            continue
+
+        if _is_atenciosamente(lines[-1]):
+            lines.pop()
+            continue
+
+        break
 
     t = "\n".join(lines).strip()
+    t = re.sub(r"\n{3,}", "\n\n", t).strip()
 
-    return f"{t}\n\n{FINAL_SIGNATURE}"
+    if not t:
+        return FINAL_SIGNATURE
+
+    return f"{t}\n\n{FINAL_SIGNATURE}".strip()
 
 
 def _build_input_summary(data: dict) -> str:
-    return (
-        f"Cliente: {data.get('client_name')} | "
-        f"Serviço: {data.get('service')} | "
-        f"Valor: {data.get('price')} | "
-        f"Prazo: {data.get('deadline')} | "
-        f"Objetivo: {data.get('objective')}"
-    )
+    client = (data.get("client_name") or "").strip()
+    service = (data.get("service") or "").strip()
+    scope = (data.get("scope") or "").strip()
+    price = (data.get("price") or "").strip()
+    deadline = (data.get("deadline") or "").strip()
+    tone = (data.get("tone") or "").strip()
+    objective = (data.get("objective") or "").strip()
+
+    summary = (
+        f"Cliente: {client} | Serviço: {service} | Escopo: {scope} | Valor: {price} | "
+        f"Prazo: {deadline} | Tom: {tone} | Objetivo: {objective}"
+    ).strip()
+
+    return summary if summary else "Resumo indisponível"
 
 
 def _build_ai_prompt(data: dict) -> str:
     return f"""
-Crie uma proposta comercial profissional em português (PT-BR).
+Você é um redator sênior de propostas comerciais profissionais.
 
-REGRAS:
-- Não use colchetes
-- Não use assinatura pessoal
-- Não escreva após o encerramento
-- Linguagem impessoal e profissional
+Crie uma PROPOSTA COMERCIAL COMPLETA em português (PT-BR), clara, objetiva e profissional.
+
+REGRAS ABSOLUTAS:
+- Não utilize colchetes.
+- Não utilize placeholders.
+- Não use linguagem em primeira pessoa.
+- Não inclua nomes, cargos, telefones, e-mails ou empresa.
+- NÃO crie assinatura pessoal.
+- NÃO escreva nada após o encerramento.
 
 ENCERRAMENTO OBRIGATÓRIO:
 Atenciosamente,
 Equipe Comercial
 
 Dados:
-Cliente: {data.get('client_name')}
-Serviço: {data.get('service')}
-Escopo: {data.get('scope')}
-Prazo: {data.get('deadline')}
-Valor: {data.get('price')}
-Pagamento: {data.get('payment_terms')}
-Diferenciais: {data.get('differentiators')}
-Garantia: {data.get('warranty_support')}
-Tom: {data.get('tone')}
-Objetivo: {data.get('objective')}
+- Cliente: {data.get("client_name")}
+- Serviço: {data.get("service")}
+- Escopo: {data.get("scope")}
+- Prazo: {data.get("deadline")}
+- Investimento: {data.get("price")}
+- Condições de pagamento: {data.get("payment_terms")}
+- Diferenciais: {data.get("differentiators")}
+- Garantia / Suporte: {data.get("warranty_support")}
+
+Use tom "{data.get("tone")}" e objetivo "{data.get("objective")}".
+
+Gere somente o texto final da proposta.
 """.strip()
 
 
 def _generate_with_openai_if_available(data: dict):
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
     if not api_key:
         return None
 
+    model = (os.getenv("OPENAI_MODEL") or "gpt-4o-mini").strip()
+
     payload = {
-        "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        "model": model,
         "temperature": 0.4,
         "messages": [
-            {"role": "system", "content": "Você escreve propostas comerciais profissionais."},
+            {"role": "system", "content": "Você escreve propostas comerciais profissionais em PT-BR."},
             {"role": "user", "content": _build_ai_prompt(data)},
         ],
     }
 
     try:
-        with httpx.Client(timeout=30) as client:
-            r = client.post(
+        with httpx.Client(timeout=25.0) as client:
+            resp = client.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {api_key}",
@@ -128,7 +194,16 @@ def _generate_with_openai_if_available(data: dict):
                 json=payload,
             )
 
-        return r.json()["choices"][0]["message"]["content"].strip()
+        if resp.status_code >= 400:
+            return None
+
+        return (
+            resp.json()
+            .get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
     except Exception:
         return None
 
@@ -142,13 +217,15 @@ def home(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=303)
-
     return RedirectResponse("/create" if user.is_paid else "/paywall", status_code=303)
 
 
 @router.get("/create")
 def create_page(request: Request, db: Session = Depends(get_db)):
-    require_paid_user(request, db)
+    try:
+        require_paid_user(request, db)
+    except PermissionError:
+        return _redirect_paywall()
 
     return request.app.state.templates.TemplateResponse(
         "create_proposal.html",
@@ -172,26 +249,31 @@ def create_action(
     preset_id: str = Form(None),
     db: Session = Depends(get_db),
 ):
-    user = require_paid_user(request, db)
+    try:
+        user = require_paid_user(request, db)
+    except PermissionError:
+        return _redirect_paywall()
 
     data = {
-        "client_name": client_name.strip(),
-        "service": service.strip(),
-        "scope": scope.strip(),
-        "deadline": deadline.strip(),
-        "price": price.strip(),
-        "payment_terms": payment_terms.strip(),
-        "differentiators": differentiators.strip(),
-        "warranty_support": warranty_support.strip(),
-        "tone": tone.lower().strip(),
-        "objective": objective.lower().strip(),
+        "client_name": (client_name or "").strip(),
+        "service": (service or "").strip(),
+        "scope": (scope or "").strip(),
+        "deadline": (deadline or "").strip(),
+        "price": (price or "").strip(),
+        "payment_terms": (payment_terms or "").strip(),
+        "differentiators": (differentiators or "").strip(),
+        "warranty_support": (warranty_support or "").strip(),
+        "tone": (tone or "").strip().lower(),
+        "objective": (objective or "").strip().lower(),
     }
 
-    if preset_id and preset_id in PRESETS:
-        preset = PRESETS[preset_id]
-        for k in preset:
-            if not data.get(k):
-                data[k] = preset[k]
+    # aplica preset (1 clique) se veio preset_id (sem sobrescrever campos preenchidos)
+    preset_id_clean = (preset_id or "").strip()
+    if preset_id_clean and preset_id_clean in PRESETS:
+        preset = PRESETS[preset_id_clean]
+        for key in ["service", "scope", "differentiators", "warranty_support", "deadline", "price", "payment_terms"]:
+            if key in preset and not data.get(key):
+                data[key] = (preset.get(key) or "").strip()
 
     text = _generate_with_openai_if_available(data)
     if not text:
@@ -199,7 +281,7 @@ def create_action(
 
     text = _sanitize_proposal_text(text)
 
-    proposal = Proposal(
+    p = Proposal(
         user_id=user.id,
         client_name=data["client_name"],
         service=data["service"],
@@ -212,23 +294,29 @@ def create_action(
         created_at=datetime.utcnow(),
     )
 
-    db.add(proposal)
+    db.add(p)
     db.commit()
-    db.refresh(proposal)
+    db.refresh(p)
+
+    created_date = ""
+    try:
+        if p.created_at:
+            created_date = p.created_at.strftime("%d/%m/%Y")
+    except Exception:
+        created_date = str(p.created_at) if p.created_at else ""
 
     return request.app.state.templates.TemplateResponse(
         "result.html",
-        {
-            "request": request,
-            "proposal": proposal,
-            "created_date": proposal.created_at.strftime("%d/%m/%Y"),
-        },
+        {"request": request, "proposal": p, "created_date": created_date},
     )
 
 
 @router.get("/history")
 def history_page(request: Request, db: Session = Depends(get_db)):
-    user = require_paid_user(request, db)
+    try:
+        user = require_paid_user(request, db)
+    except PermissionError:
+        return _redirect_paywall()
 
     proposals = (
         db.query(Proposal)
@@ -245,28 +333,42 @@ def history_page(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/proposal/{proposal_id}/pdf")
 def proposal_pdf(proposal_id: int, request: Request, db: Session = Depends(get_db)):
-    user = require_paid_user(request, db)
+    try:
+        user = require_paid_user(request, db)
+    except PermissionError:
+        return _redirect_paywall()
 
-    proposal = (
+    p = (
         db.query(Proposal)
         .filter(Proposal.id == proposal_id, Proposal.user_id == user.id)
         .first()
     )
 
-    if not proposal:
+    if not p:
         return RedirectResponse("/history", status_code=303)
 
-    pdf_bytes = build_proposal_pdf(
-        client_name=proposal.client_name,
-        service=proposal.service,
-        price=proposal.price,
-        proposal_text=proposal.proposal_text,
-    )
+    # Opção B: gera bytes em memória (sem salvar em disco)
+    try:
+        pdf_bytes = build_proposal_pdf(
+            title="Proposta Comercial",
+            client_name=p.client_name or "",
+            service=p.service or "",
+            deadline=p.deadline or "",  # pode ser vazio sem crash
+            price=p.price or "",
+            proposal_text=p.proposal_text or "",
+        )
+    except Exception:
+        logger.exception("Erro ao gerar PDF da proposta id=%s user_id=%s", p.id, user.id)
+        # deixa FastAPI devolver 500, mas com log útil
+        raise
+
+    filename = f"proposta_{p.id}.pdf"
 
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'attachment; filename="proposta_{proposal.id}.pdf"'
+            # attachment -> força download
+            "Content-Disposition": f'attachment; filename="{filename}"'
         },
     )
