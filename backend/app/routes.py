@@ -25,6 +25,9 @@ router = APIRouter()
 FINAL_SIGNATURE = "Atenciosamente,\nEquipe Comercial"
 logger = logging.getLogger(__name__)
 
+# ===== PASSO 1 (Mudança A): marcador simples para provar origem da geração =====
+_LAST_GEN = {"used": "unknown"}  # "openai" | "local" | "unknown"
+
 
 # ======================================================
 # Helpers
@@ -164,36 +167,67 @@ def _build_input_summary(data: dict) -> str:
 
 
 def _build_ai_prompt(data: dict) -> str:
-    return f"""
-Você é um redator sênior de propostas comerciais profissionais.
+    client = (data.get("client_name") or "").strip()
+    service = (data.get("service") or "").strip()
+    scope = (data.get("scope") or "").strip()
+    deadline = (data.get("deadline") or "").strip()
+    price = (data.get("price") or "").strip()
+    payment_terms = (data.get("payment_terms") or "").strip()
+    differentiators = (data.get("differentiators") or "").strip()
+    warranty_support = (data.get("warranty_support") or "").strip()
+    tone = (data.get("tone") or "").strip()
+    objective = (data.get("objective") or "").strip()
 
-Crie uma PROPOSTA COMERCIAL COMPLETA em português (PT-BR), clara, objetiva e profissional.
+    return f"""
+Você é um especialista em PROPOSTAS COMERCIAIS para serviços (marketing, tráfego pago, social media, design, web, consultoria e prestação de serviços).
+
+TAREFA:
+Gerar uma PROPOSTA COMERCIAL completa em PT-BR, pronta para envio, com linguagem profissional, objetiva e sem repetição de frases genéricas.
 
 REGRAS ABSOLUTAS:
-- Não utilize colchetes.
-- Não utilize placeholders.
-- Não use linguagem em primeira pessoa.
-- Não inclua nomes, cargos, telefones, e-mails ou empresa.
-- NÃO crie assinatura pessoal.
-- NÃO escreva nada após o encerramento.
+1) Proibido: colchetes, placeholders, "insira", "exemplo", "lorem ipsum".
+2) Não usar 1ª pessoa ("eu", "meu", "nós"). Escreva em tom institucional.
+3) Não citar e-mail, telefone, CNPJ, endereço, nome de empresa, cargo ou assinatura pessoal.
+4) Não usar markdown pesado. Pode usar títulos simples e listas com hífen.
+5) O texto deve ser ESPECÍFICO ao serviço e ao escopo informados. Não inventar outro serviço.
+6) Variação controlada: escolha 1 de 3 estilos de abertura abaixo (use apenas 1, não liste):
+   A) "Encaminha-se a presente proposta..."
+   B) "Segue proposta comercial..."
+   C) "Apresenta-se abaixo a proposta..."
 
-ENCERRAMENTO OBRIGATÓRIO:
-Atenciosamente,
-Equipe Comercial
+ESTRUTURA OBRIGATÓRIA (seções curtas):
+1. Diagnóstico e contexto (2–4 linhas, baseado no serviço/escopo)
+2. Objetivo (1–3 linhas)
+3. Escopo por entregáveis (lista objetiva; 6–12 itens no máximo, só do escopo)
+4. Metodologia e alinhamentos (3–6 bullets: reuniões, aprovações, comunicação, acesso)
+5. Cronograma (se prazo informado, use; senão, proponha 2 etapas simples)
+6. Investimento (valor + o que inclui; sem “a partir de”)
+7. Condições de pagamento (usar o texto do campo; se vazio, sugerir 2 opções curtas)
+8. Garantia / Suporte (usar o campo; se vazio, 1 parágrafo curto padrão)
+9. Próximos passos (3 bullets curtos)
 
-Dados:
-- Cliente: {data.get("client_name")}
-- Serviço: {data.get("service")}
-- Escopo: {data.get("scope")}
-- Prazo: {data.get("deadline")}
-- Investimento: {data.get("price")}
-- Condições de pagamento: {data.get("payment_terms")}
-- Diferenciais: {data.get("differentiators")}
-- Garantia / Suporte: {data.get("warranty_support")}
+ENCERRAMENTO:
+- NÃO escreva assinatura.
+- É PROIBIDO escrever “Atenciosamente” em qualquer parte do texto.
+- Termine o texto imediatamente após a seção "Próximos passos".
 
-Use tom "{data.get("tone")}" e objetivo "{data.get("objective")}".
+DADOS PARA USAR (não invente outros):
+- Cliente: {client}
+- Serviço: {service}
+- Escopo: {scope}
+- Prazo: {deadline}
+- Investimento: {price}
+- Condições de pagamento: {payment_terms}
+- Diferenciais: {differentiators}
+- Garantia/Suporte: {warranty_support}
+- Tom: {tone}
+- Objetivo: {objective}
 
-Gere somente o texto final da proposta.
+IMPORTANTE:
+- Se houver conflito entre Serviço e Escopo, trate o SERVIÇO como o nome principal e use o ESCOPO como entregáveis.
+- Não escreva nada após finalizar "Próximos passos".
+
+Agora gere somente o texto final da proposta.
 """.strip()
 
 
@@ -227,13 +261,19 @@ def _generate_with_openai_if_available(data: dict):
         if resp.status_code >= 400:
             return None
 
-        return (
+        text = (
             resp.json()
             .get("choices", [{}])[0]
             .get("message", {})
             .get("content", "")
             .strip()
         )
+
+        # ===== PASSO 1 (Mudança A): marca que veio do OpenAI =====
+        if text:
+            _LAST_GEN["used"] = "openai"
+
+        return text
     except Exception:
         return None
 
@@ -304,8 +344,15 @@ def create_action(
             if key in preset and not data.get(key):
                 data[key] = (preset.get(key) or "").strip()
 
+    # ===== SUBSTITUIÇÃO (mesma lógica, só adiciona LOG) =====
     text = _generate_with_openai_if_available(data)
-    if not text:
+    if text:
+        logger.info("GPT OK ✅ Proposta gerada pelo OpenAI.")
+    else:
+        # ===== PASSO 1 (Mudança A): marca fallback local =====
+        _LAST_GEN["used"] = "local"
+
+        logger.warning("GPT OFF ⚠️ Caindo no gerador padrão (fallback).")
         text = generate_proposal_text(data)
 
     text = _sanitize_proposal_text(text)
@@ -334,10 +381,13 @@ def create_action(
     except Exception:
         created_date = str(p.created_at) if p.created_at else ""
 
-    return request.app.state.templates.TemplateResponse(
+    # ===== PASSO 1 (Mudança A): devolve header na resposta HTML =====
+    resp = request.app.state.templates.TemplateResponse(
         "result.html",
         {"request": request, "user": user, "proposal": p, "created_date": created_date},
     )
+    resp.headers["X-Proposal-Generator"] = _LAST_GEN.get("used", "unknown")
+    return resp
 
 
 @router.get("/history")
@@ -424,5 +474,5 @@ def proposal_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": f'attachment; filename=\"{filename}\"'},
     )
