@@ -228,8 +228,8 @@ textarea:focus{
         | replace('[nome da empresa]', '')
     %}
 
-    {# 🔒 Força encerramento fixo #}
-    {% set t = t.strip() ~ "\n\nAtenciosamente,\nEquipe Comercial" %}
+    {# ✅ NÃO força encerramento aqui (assinatura é controlada no backend) #}
+    {% set t = t.strip() %}
 
     <textarea id="proposal_text" rows="18" readonly>{{ t }}</textarea>
 

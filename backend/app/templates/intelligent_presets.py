@@ -1,31 +1,32 @@
+# backend/app/templates/intelligent_presets.py
 from __future__ import annotations
 
 PRESETS = {
 
-    # =========================
+    # ==================================================
     # MARKETING
-    # =========================
+    # ==================================================
 
     "social_media": {
         "label": "Social Media Premium",
         "service": "Gestão de Social Media Premium",
         "scope": (
-            "Gestão estratégica de redes sociais com foco em posicionamento, "
-            "engajamento qualificado e suporte aos objetivos comerciais da marca.\n\n"
+            "Gestão estratégica de redes sociais com foco em posicionamento de marca, "
+            "engajamento qualificado e apoio aos objetivos comerciais.\n\n"
             "Entregáveis:\n"
             "• Planejamento editorial mensal\n"
             "• Criação de conteúdo para feed e stories (conforme pacote)\n"
             "• Redação de copies estratégicas\n"
-            "• Direção visual e padronização de identidade\n"
-            "• Monitoramento de desempenho e engajamento\n"
-            "• Relatório mensal com insights e recomendações\n\n"
+            "• Direção visual e padronização da identidade\n"
+            "• Monitoramento de engajamento e desempenho\n"
+            "• Relatório mensal com análises e recomendações\n\n"
             "Limites e condições:\n"
-            "• Materiais e informações fornecidos pelo cliente\n"
+            "• Informações, materiais e insumos fornecidos pelo cliente\n"
             "• Alterações após aprovação podem gerar ajustes de escopo\n"
         ),
         "differentiators": (
             "Conteúdo planejado com visão estratégica, consistência visual "
-            "e foco em clareza da mensagem."
+            "e clareza na comunicação."
         ),
         "warranty_support": (
             "Até duas rodadas de ajustes por entrega. Suporte assíncrono em horário comercial."
@@ -42,8 +43,8 @@ PRESETS = {
             "• Estruturação e configuração de campanhas\n"
             "• Criação e testes de anúncios (variações)\n"
             "• Otimização contínua de públicos, criativos e orçamento\n"
-            "• Monitoramento de métricas e performance\n"
-            "• Relatórios periódicos com análise e recomendações\n\n"
+            "• Monitoramento de métricas e desempenho\n"
+            "• Relatórios periódicos com análises e próximos passos\n\n"
             "Limites e condições:\n"
             "• Verba de mídia não inclusa (responsabilidade do cliente)\n"
             "• Resultados dependem de fatores como mercado, oferta e orçamento\n"
@@ -63,12 +64,12 @@ PRESETS = {
             "Desenvolvimento de peças visuais com foco em comunicação clara, "
             "estética profissional e alinhamento ao posicionamento da marca.\n\n"
             "Entregáveis:\n"
-            "• Criação de peças para campanhas e redes sociais\n"
+            "• Peças para campanhas, anúncios e redes sociais\n"
             "• Definição de direção visual com variações\n"
             "• Entrega de arquivos finais nos formatos acordados\n\n"
             "Limites e condições:\n"
             "• Revisões dentro do escopo contratado\n"
-            "• Mudanças de direção podem gerar aditivos\n"
+            "• Mudanças de direção visual podem gerar aditivos\n"
         ),
         "differentiators": (
             "Design estratégico voltado à clareza da mensagem e impacto visual."
@@ -78,21 +79,21 @@ PRESETS = {
         ),
     },
 
-    # =========================
+    # ==================================================
     # WEB
-    # =========================
+    # ==================================================
 
     "sites": {
         "label": "Criação de Site",
         "service": "Criação de Site Profissional",
         "scope": (
-            "Desenvolvimento de site institucional com foco em clareza, "
-            "estrutura profissional e apresentação da marca.\n\n"
+            "Desenvolvimento de site institucional com foco em apresentação profissional, "
+            "organização da informação e presença digital.\n\n"
             "Entregáveis:\n"
             "• Estrutura e organização das páginas\n"
             "• Design responsivo\n"
             "• Conteúdo institucional estruturado\n"
-            "• SEO básico\n\n"
+            "• SEO básico on-page\n\n"
             "Limites e condições:\n"
             "• Hospedagem, domínio e ferramentas externas não inclusos\n"
         ),
@@ -111,10 +112,10 @@ PRESETS = {
             "Criação de landing page focada em conversão, captação de leads "
             "e comunicação objetiva.\n\n"
             "Entregáveis:\n"
-            "• Estrutura persuasiva com foco em conversão\n"
+            "• Estrutura persuasiva orientada à conversão\n"
             "• Design responsivo\n"
             "• Copy clara e orientada à ação\n"
-            "• Integrações com formulários, WhatsApp ou pixel\n"
+            "• Integrações com formulário, WhatsApp ou pixel\n"
             "• Testes básicos de usabilidade\n\n"
             "Limites e condições:\n"
             "• Ferramentas externas não inclusas, salvo acordo\n"
@@ -127,21 +128,21 @@ PRESETS = {
         ),
     },
 
-    # =========================
+    # ==================================================
     # SERVIÇOS
-    # =========================
+    # ==================================================
 
     "consultoria": {
         "label": "Consultoria",
         "service": "Consultoria Estratégica",
         "scope": (
-            "Diagnóstico estratégico, análise de cenários, definição de prioridades "
-            "e elaboração de plano de ação com acompanhamento consultivo.\n\n"
+            "Diagnóstico estratégico do cenário atual, análise de oportunidades, "
+            "definição de prioridades e elaboração de plano de ação com acompanhamento consultivo.\n\n"
             "Entregáveis:\n"
             "• Reunião inicial de diagnóstico\n"
             "• Análise de cenário e oportunidades\n"
             "• Plano de ação estruturado\n"
-            "• Sessões de acompanhamento\n\n"
+            "• Sessões de acompanhamento consultivo\n\n"
             "Limites e condições:\n"
             "• Execução operacional não inclusa\n"
         ),
@@ -157,13 +158,13 @@ PRESETS = {
         "label": "Prestador Local",
         "service": "Serviço Local (Prestador)",
         "scope": (
-            "Prestação de serviço prático com escopo claro, "
-            "prazos definidos e condições objetivas.\n\n"
+            "Prestação de serviço pontual com escopo definido, "
+            "prazos acordados e entrega objetiva.\n\n"
             "Entregáveis:\n"
-            "• Execução do serviço conforme escopo acordado\n"
-            "• Cumprimento de prazos\n"
-            "• Comunicação clara durante o processo\n"
-            "• Entrega final conforme combinado\n\n"
+            "• Execução do serviço conforme escopo combinado\n"
+            "• Cumprimento dos prazos estabelecidos\n"
+            "• Comunicação clara durante a execução\n"
+            "• Entrega final conforme acordado\n\n"
             "Limites e condições:\n"
             "• Alterações fora do escopo devem ser renegociadas\n"
         ),
@@ -175,18 +176,18 @@ PRESETS = {
         ),
     },
 
-    # =========================
-    # RECORRENTES
-    # =========================
+    # ==================================================
+    # CONTRATOS / RECORRENTES
+    # ==================================================
 
     "mensal": {
-        "label": "Mensal",
+        "label": "Contrato Mensal",
         "service": "Contrato Mensal de Serviços",
         "scope": (
             "Prestação mensal recorrente de serviços com entregas previsíveis "
             "e acompanhamento contínuo.\n\n"
             "Entregáveis:\n"
-            "• Pacote mensal de entregas\n"
+            "• Pacote mensal de entregas conforme escopo\n"
             "• Reunião mensal de alinhamento\n"
             "• Relatório de acompanhamento\n\n"
             "Limites e condições:\n"
@@ -204,14 +205,14 @@ PRESETS = {
         "label": "Contrato Fechado",
         "service": "Projeto com Escopo Fechado",
         "scope": (
-            "Projeto fechado com fases definidas, entregas claras "
-            "e critérios objetivos de aceite.\n\n"
+            "Projeto com escopo fechado, fases definidas, "
+            "entregas claras e critérios objetivos de aceite.\n\n"
             "Entregáveis:\n"
-            "• Definição de fases do projeto\n"
-            "• Entregas conforme cronograma\n"
+            "• Definição das fases do projeto\n"
+            "• Entregas conforme cronograma acordado\n"
             "• Validação e aceite por etapa\n\n"
             "Limites e condições:\n"
-            "• Alterações de escopo após aceite podem gerar aditivos\n"
+            "• Alterações após aceite podem gerar aditivos\n"
         ),
         "differentiators": (
             "Segurança comercial, clareza contratual e previsibilidade de entrega."
