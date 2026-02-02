@@ -1,54 +1,230 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Histórico</h2>
 
-{% if proposals and proposals|length > 0 %}
-  <div class="card">
-    <p class="muted">Últimas {{ proposals|length }} propostas (máximo 50)</p>
+<style>
+.page-wrap{
+  max-width: 980px;
+  margin: 0 auto;
+}
 
-    <div style="overflow:auto;">
-      <table style="width:100%; border-collapse: collapse;">
-        <thead>
-          <tr>
-            <th style="text-align:left; padding:10px; border-bottom:1px solid #dcdcdc;">Data</th>
-            <th style="text-align:left; padding:10px; border-bottom:1px solid #dcdcdc;">Cliente</th>
-            <th style="text-align:left; padding:10px; border-bottom:1px solid #dcdcdc;">Serviço</th>
-            <th style="text-align:left; padding:10px; border-bottom:1px solid #dcdcdc;">Valor</th>
-            <th style="text-align:left; padding:10px; border-bottom:1px solid #dcdcdc;">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for p in proposals %}
-          <tr>
-            <td style="padding:10px; border-bottom:1px solid #eee;">
-              {{ p.created_at.strftime("%d/%m/%Y %H:%M") if p.created_at else "" }}
-            </td>
-            <td style="padding:10px; border-bottom:1px solid #eee;">
-              {{ p.client_name }}
-            </td>
-            <td style="padding:10px; border-bottom:1px solid #eee;">
-              {{ p.service }}
-            </td>
-            <td style="padding:10px; border-bottom:1px solid #eee;">
-              {{ p.price }}
-            </td>
-            <td style="padding:10px; border-bottom:1px solid #eee;">
-              <a href="/proposal/{{ p.id }}">Abrir</a>
-              &nbsp;•&nbsp;
-              <a href="/proposal/{{ p.id }}/pdf">PDF</a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+.header{
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 10px 0 14px 0;
+}
+
+.header h2{
+  margin: 0;
+  font-size: 20px;
+  font-weight: 950;
+  letter-spacing: -0.2px;
+  color: #111827;
+}
+
+.header .sub{
+  margin: 4px 0 0 0;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.btn{
+  appearance: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 900;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #111827;
+  transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn:hover{
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.btn-primary{
+  border: none;
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 10px 20px rgba(37,99,235,0.16);
+}
+
+.card{
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 18px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.table-wrap{
+  overflow: auto;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+}
+
+table{
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+  background: #ffffff;
+}
+
+thead th{
+  text-align: left;
+  padding: 12px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 12px;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: .45px;
+}
+
+tbody td{
+  padding: 12px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+  color: #111827;
+  vertical-align: top;
+}
+
+tbody tr:hover{
+  background: #f8fafc;
+}
+
+.actions{
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.action-link{
+  font-weight: 900;
+  font-size: 12px;
+  text-decoration: none;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  padding: 7px 10px;
+  border-radius: 999px;
+}
+
+.action-link:hover{
+  filter: brightness(0.98);
+}
+
+.badge{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 900;
+  color: #111827;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  padding: 6px 10px;
+  border-radius: 999px;
+}
+
+.empty{
+  text-align: center;
+  padding: 26px 16px;
+}
+
+.empty h3{
+  margin: 0 0 6px 0;
+  font-size: 16px;
+  font-weight: 950;
+  color: #111827;
+}
+
+.empty p{
+  margin: 0 0 14px 0;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.5;
+}
+</style>
+
+<div class="page-wrap">
+
+  <div class="header">
+    <div>
+      <h2>Histórico</h2>
+      {% if proposals and proposals|length > 0 %}
+        <p class="sub">Você tem {{ proposals|length }} proposta(s) salva(s). Baixe o PDF sempre que precisar.</p>
+      {% else %}
+        <p class="sub">Suas propostas ficam salvas aqui para reutilizar depois.</p>
+      {% endif %}
     </div>
+
+    <a class="btn btn-primary" href="/create">➕ Criar proposta</a>
   </div>
-{% else %}
-  <div class="card">
-    <p>Nenhuma proposta ainda.</p>
-    <a href="/create"><button type="button">Criar primeira proposta</button></a>
-  </div>
-{% endif %}
+
+  {% if proposals and proposals|length > 0 %}
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+        <span class="badge">📌 Últimas {{ proposals|length }} propostas (máximo 50)</span>
+        <span style="color:#6b7280; font-size:12px;">Dica: clique em “PDF” para baixar.</span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Cliente</th>
+              <th>Serviço</th>
+              <th>Valor</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in proposals %}
+              <tr>
+                <td>
+                  {{ p.created_at.strftime("%d/%m/%Y %H:%M") if p.created_at else "" }}
+                </td>
+                <td><strong>{{ p.client_name }}</strong></td>
+                <td>{{ p.service }}</td>
+                <td><strong>{{ p.price }}</strong></td>
+                <td>
+                  <div class="actions">
+                    <a class="action-link" href="/proposal/{{ p.id }}/pdf">📄 PDF</a>
+
+                    {# Observação: este link só funciona se existir rota GET /proposal/{id}.
+                       Se você quiser, eu crio essa rota depois e a gente ativa de novo. #}
+                    {# <a class="action-link" href="/proposal/{{ p.id }}">🔎 Abrir</a> #}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  {% else %}
+    <div class="card empty">
+      <h3>Nenhuma proposta ainda</h3>
+      <p>Crie sua primeira proposta e salve para baixar em PDF quando quiser.</p>
+      <a class="btn btn-primary" href="/create">🚀 Criar primeira proposta</a>
+    </div>
+  {% endif %}
+
+</div>
 
 {% endblock %}

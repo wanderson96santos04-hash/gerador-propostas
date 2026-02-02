@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+  .wrap{ max-width: 980px; margin: 0 auto; }
+
+  .hero{
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    padding: 22px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  .hero h2{
+    margin: 0 0 8px 0;
+    font-size: 28px;
+    font-weight: 950;
+    letter-spacing: -0.5px;
+    line-height: 1.12;
+    color: #111827;
+  }
+
+  .hero p{
+    margin: 0 0 14px 0;
+    font-size: 15px;
+    color: #4b5563;
+    line-height: 1.55;
+    max-width: 720px;
+  }
+
+  .cta-row{
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 10px;
+  }
+
+  .cta{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-weight: 950;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  .cta.primary{
+    background: #2563eb;
+    color: white;
+    box-shadow: 0 12px 24px rgba(37,99,235,0.18);
+  }
+
+  .cta.secondary{
+    border: 1px solid #e5e7eb;
+    background: white;
+    color: #111827;
+  }
+
+  .cta.primary:hover{ transform: translateY(-1px); }
+  .cta.secondary:hover{ border-color: #cbd5e1; }
+
+  .steps{
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+  }
+
+  @media (max-width: 860px){
+    .steps{ grid-template-columns: 1fr; }
+  }
+
+  .step{
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    background: white;
+    padding: 14px;
+  }
+
+  .step .t{
+    font-weight: 950;
+    color: #111827;
+    margin-bottom: 6px;
+  }
+
+  .step .d{
+    color: #6b7280;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .proof{
+    margin-top: 14px;
+    color: #4b5563;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .proof strong{ color: #111827; }
+</style>
+
+<div class="wrap">
+  <div class="hero">
+    <h2>Gere propostas profissionais que fecham vendas em minutos</h2>
+    <p>
+      Crie propostas claras, organizadas e prontas para enviar por WhatsApp, email ou PDF — sem perder tempo escrevendo do zero.
+    </p>
+
+    <div class="cta-row">
+      <a class="cta primary" href="/create">🚀 Gerar proposta agora</a>
+      <a class="cta secondary" href="/login">Já tenho conta</a>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="t">1) Preencha os dados</div>
+        <div class="d">Cliente, serviço, prazo e investimento.</div>
+      </div>
+      <div class="step">
+        <div class="t">2) Gere a proposta</div>
+        <div class="d">Texto pronto, profissional e organizado.</div>
+      </div>
+      <div class="step">
+        <div class="t">3) Baixe o PDF</div>
+        <div class="d">Envie com aparência de empresa e mais confiança.</div>
+      </div>
+    </div>
+
+    <div class="proof">
+      <strong>Ideal para:</strong> social media, designers, gestores, freelancers e prestadores de serviço.
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,23 +1,208 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Proposta Gerada</h2>
 
-<div class="card">
-    <p><strong>Cliente:</strong> {{ proposal.client_name }}</p>
-    <p><strong>Serviço:</strong> {{ proposal.service }}</p>
-    <p><strong>Valor:</strong> {{ proposal.price }}</p>
-    <p><strong>Data:</strong> {{ proposal.created_at.strftime("%d/%m/%Y") if proposal.created_at else "" }}</p>
+<style>
+.page-wrap{
+  max-width: 980px;
+  margin: 0 auto;
+}
 
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin:12px 0 6px;">
-        <a href="/proposal/{{ proposal.id }}/pdf"><button type="button">Baixar PDF</button></a>
-        <a href="/history"><button type="button">Ver Histórico</button></a>
-        <a href="/create"><button type="button">Criar Outra</button></a>
+.header-card{
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  padding: 18px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  margin-bottom: 14px;
+}
+
+.header-card h2{
+  margin: 0 0 10px 0;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.2px;
+}
+
+.meta-grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+  margin-top: 10px;
+}
+
+@media (max-width: 760px){
+  .meta-grid{ grid-template-columns: 1fr; }
+}
+
+.meta-item{
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 12px 12px;
+}
+
+.meta-label{
+  font-size: 11px;
+  font-weight: 800;
+  color: #6b7280;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+
+.meta-value{
+  font-size: 14px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.actions{
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.btn{
+  appearance: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 900;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #111827;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+
+.btn:hover{
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.btn-primary{
+  border: none;
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 10px 20px rgba(37,99,235,0.18);
+}
+
+.btn-primary:hover{ transform: translateY(-1px); }
+
+.note{
+  margin-top: 10px;
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.45;
+}
+
+.card-clean{
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 18px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.card-clean h3{
+  margin: 0 0 10px 0;
+  font-size: 15px;
+  font-weight: 900;
+  color: #111827;
+}
+
+textarea{
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  outline: none;
+  background: #ffffff;
+}
+
+textarea:focus{
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.muted{
+  margin: 10px 0 12px 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.copy-row{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.toast{
+  display: none;
+  font-size: 12px;
+  font-weight: 800;
+  color: #065f46;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+</style>
+
+<div class="page-wrap">
+
+  <div class="header-card">
+    <h2>Proposta gerada ✅</h2>
+
+    <div class="meta-grid">
+      <div class="meta-item">
+        <div class="meta-label">Cliente</div>
+        <div class="meta-value">{{ proposal.client_name }}</div>
+      </div>
+
+      <div class="meta-item">
+        <div class="meta-label">Serviço</div>
+        <div class="meta-value">{{ proposal.service }}</div>
+      </div>
+
+      <div class="meta-item">
+        <div class="meta-label">Valor</div>
+        <div class="meta-value">{{ proposal.price }}</div>
+      </div>
+
+      <div class="meta-item">
+        <div class="meta-label">Data</div>
+        <div class="meta-value">{{ proposal.created_at.strftime("%d/%m/%Y") if proposal.created_at else "" }}</div>
+      </div>
     </div>
-</div>
 
-<div class="card">
-    <h3>Texto da Proposta</h3>
+    <div class="actions">
+      <a href="/proposal/{{ proposal.id }}/pdf">
+        <button type="button" class="btn btn-primary">📄 Baixar PDF</button>
+      </a>
+
+      <a href="/history">
+        <button type="button" class="btn">📚 Ver histórico</button>
+      </a>
+
+      <a href="/create">
+        <button type="button" class="btn">➕ Criar outra</button>
+      </a>
+    </div>
+
+    <div class="note">
+      Dica: copie o texto abaixo e envie por WhatsApp/email. Se for enviar como documento, use o botão <strong>Baixar PDF</strong>.
+    </div>
+  </div>
+
+  <div class="card-clean">
+    <h3>Texto da proposta</h3>
 
     {# 🔒 PORTÃO FINAL: corta tudo após "Próximos passos" (com variações) #}
     {% set t = proposal.proposal_text %}
@@ -48,22 +233,51 @@
 
     <textarea id="proposal_text" rows="18" readonly>{{ t }}</textarea>
 
-    <p class="muted">Clique no texto acima para selecionar e copiar, ou use o botão.</p>
+    <p class="muted">Clique no texto para selecionar e copiar, ou use o botão abaixo.</p>
 
-    <button type="button" onclick="copyProposal()">Copiar texto</button>
+    <div class="copy-row">
+      <button type="button" class="btn btn-primary" onclick="copyProposal()">📋 Copiar texto</button>
+      <div id="copyToast" class="toast">✅ Texto copiado!</div>
+    </div>
+
+  </div>
+
 </div>
 
 <script>
 function copyProposal() {
   const el = document.getElementById("proposal_text");
+  const toast = document.getElementById("copyToast");
+
+  // Preferir Clipboard API quando disponível
+  const text = el.value;
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => {
+      toast.style.display = "inline-flex";
+      setTimeout(() => { toast.style.display = "none"; }, 1800);
+    }).catch(() => {
+      fallbackCopy(el, toast);
+    });
+    return;
+  }
+
+  fallbackCopy(el, toast);
+}
+
+function fallbackCopy(el, toast) {
+  el.focus();
   el.select();
   el.setSelectionRange(0, 999999);
+
   try {
     document.execCommand("copy");
-    alert("Texto copiado!");
+    toast.style.display = "inline-flex";
+    setTimeout(() => { toast.style.display = "none"; }, 1800);
   } catch (e) {
     alert("Não consegui copiar automaticamente. Selecione e copie manualmente.");
   }
 }
 </script>
+
 {% endblock %}

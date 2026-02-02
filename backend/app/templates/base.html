@@ -1,34 +1,116 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <title>{{ title or APP_NAME }}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/static/css/styles.css">
+  <meta charset="UTF-8">
+  <title>{{ title or APP_NAME }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/css/styles.css">
+
+  <style>
+    .topo{
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(255,255,255,.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .topo .container{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 0;
+    }
+
+    .logo{
+      margin: 0;
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: -0.2px;
+      color: #111827;
+      cursor: default;
+    }
+
+    .nav{
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .nav a{
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 13px;
+      color: #111827;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      transition: all .12s ease;
+    }
+
+    .nav a:hover{
+      background: #f3f4f6;
+      border-color: #e5e7eb;
+    }
+
+    .nav a.primary{
+      background: #2563eb;
+      color: #fff;
+      border-color: #2563eb;
+      box-shadow: 0 10px 20px rgba(37,99,235,0.16);
+    }
+
+    .nav a.primary:hover{
+      filter: brightness(0.98);
+      transform: translateY(-1px);
+    }
+
+    main.container{
+      padding-top: 16px;
+      padding-bottom: 24px;
+    }
+
+    .rodape{
+      border-top: 1px solid #e5e7eb;
+      background: #ffffff;
+    }
+
+    .rodape .container{
+      padding: 14px 0;
+      color: #6b7280;
+    }
+  </style>
 </head>
 <body>
-    <header class="topo">
-        <div class="container">
-            <h1 class="logo">{{ APP_NAME }}</h1>
+  <header class="topo">
+    <div class="container">
+      <h1 class="logo">{{ APP_NAME }}</h1>
 
-            {% if user %}
-                <nav class="nav">
-                    <a href="/create">Criar Proposta</a>
-                    <a href="/history">Histórico</a>
-                    <a href="/logout">Sair</a>
-                </nav>
-            {% endif %}
-        </div>
-    </header>
+      <nav class="nav">
+        {% if user %}
+          <a href="/create">Criar Proposta</a>
+          <a href="/history">Histórico</a>
+          <a href="/logout">Sair</a>
+        {% else %}
+          <a href="/login">Entrar</a>
+          <a href="/register">Criar conta</a>
+          <a class="primary" href="/create">Gerar proposta</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
 
-    <main class="container">
-        {% block content %}{% endblock %}
-    </main>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
 
-    <footer class="rodape">
-        <div class="container">
-            <small>© 2026 • {{ APP_NAME }}</small>
-        </div>
-    </footer>
+  <footer class="rodape">
+    <div class="container">
+      <small>© 2026 • {{ APP_NAME }}</small>
+    </div>
+  </footer>
 </body>
 </html>

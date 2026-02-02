@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.db.models import Proposal
-from app.auth.routes import get_current_user, require_paid_user
+from app.auth.routes import get_current_user  # vamos usar direto (mais seguro)
 from app.services.proposal_generator import generate_proposal_text
 from app.pdf.render_pdf import build_proposal_pdf
 
@@ -23,7 +23,6 @@ from app.templates.intelligent_presets import PRESETS
 router = APIRouter()
 
 FINAL_SIGNATURE = "Atenciosamente,\nEquipe Comercial"
-
 logger = logging.getLogger(__name__)
 
 
@@ -31,8 +30,39 @@ logger = logging.getLogger(__name__)
 # Helpers
 # ======================================================
 
+def _redirect_login() -> RedirectResponse:
+    return RedirectResponse("/login", status_code=303)
+
+
 def _redirect_paywall() -> RedirectResponse:
     return RedirectResponse("/paywall", status_code=303)
+
+
+def _get_user_or_redirect(request: Request, db: Session):
+    """
+    Retorna (user, None) se estiver OK.
+    Retorna (None, RedirectResponse) se precisar redirecionar.
+    """
+    user = get_current_user(request, db)
+    if not user:
+        return None, _redirect_login()
+    return user, None
+
+
+def _require_paid_or_redirect(request: Request, db: Session):
+    """
+    Retorna (user, None) se estiver logado e pago.
+    Retorna (None, RedirectResponse) se não estiver logado ou não pago.
+    """
+    user, redirect = _get_user_or_redirect(request, db)
+    if redirect:
+        return None, redirect
+
+    # Se o modelo User tiver is_paid
+    if not getattr(user, "is_paid", False):
+        return None, _redirect_paywall()
+
+    return user, None
 
 
 def _sanitize_proposal_text(text: str) -> str:
@@ -216,20 +246,20 @@ def _generate_with_openai_if_available(data: dict):
 def home(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
-        return RedirectResponse("/login", status_code=303)
-    return RedirectResponse("/create" if user.is_paid else "/paywall", status_code=303)
+        return _redirect_login()
+    return RedirectResponse("/create" if getattr(user, "is_paid", False) else "/paywall", status_code=303)
 
 
 @router.get("/create")
 def create_page(request: Request, db: Session = Depends(get_db)):
-    try:
-        require_paid_user(request, db)
-    except PermissionError:
-        return _redirect_paywall()
+    user, redirect = _require_paid_or_redirect(request, db)
+    if redirect:
+        return redirect
 
+    # IMPORTANTE: manda user e presets pro template (evita erros no Jinja e no base.html)
     return request.app.state.templates.TemplateResponse(
         "create_proposal.html",
-        {"request": request},
+        {"request": request, "user": user, "presets": PRESETS},
     )
 
 
@@ -249,10 +279,9 @@ def create_action(
     preset_id: str = Form(None),
     db: Session = Depends(get_db),
 ):
-    try:
-        user = require_paid_user(request, db)
-    except PermissionError:
-        return _redirect_paywall()
+    user, redirect = _require_paid_or_redirect(request, db)
+    if redirect:
+        return redirect
 
     data = {
         "client_name": (client_name or "").strip(),
@@ -307,36 +336,38 @@ def create_action(
 
     return request.app.state.templates.TemplateResponse(
         "result.html",
-        {"request": request, "proposal": p, "created_date": created_date},
+        {"request": request, "user": user, "proposal": p, "created_date": created_date},
     )
 
 
 @router.get("/history")
 def history_page(request: Request, db: Session = Depends(get_db)):
-    try:
-        user = require_paid_user(request, db)
-    except PermissionError:
-        return _redirect_paywall()
+    user, redirect = _require_paid_or_redirect(request, db)
+    if redirect:
+        return redirect
 
     proposals = (
         db.query(Proposal)
         .filter(Proposal.user_id == user.id)
         .order_by(Proposal.id.desc())
+        .limit(50)
         .all()
     )
 
     return request.app.state.templates.TemplateResponse(
         "history.html",
-        {"request": request, "proposals": proposals},
+        {"request": request, "user": user, "proposals": proposals},
     )
 
 
-@router.get("/proposal/{proposal_id}/pdf")
-def proposal_pdf(proposal_id: int, request: Request, db: Session = Depends(get_db)):
-    try:
-        user = require_paid_user(request, db)
-    except PermissionError:
-        return _redirect_paywall()
+@router.get("/proposal/{proposal_id}")
+def proposal_detail(proposal_id: int, request: Request, db: Session = Depends(get_db)):
+    """
+    Rota que o history.html usa no link "Abrir"
+    """
+    user, redirect = _require_paid_or_redirect(request, db)
+    if redirect:
+        return redirect
 
     p = (
         db.query(Proposal)
@@ -347,19 +378,45 @@ def proposal_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
     if not p:
         return RedirectResponse("/history", status_code=303)
 
-    # Opção B: gera bytes em memória (sem salvar em disco)
+    created_date = ""
+    try:
+        if p.created_at:
+            created_date = p.created_at.strftime("%d/%m/%Y")
+    except Exception:
+        created_date = str(p.created_at) if p.created_at else ""
+
+    return request.app.state.templates.TemplateResponse(
+        "proposal_detail.html",
+        {"request": request, "user": user, "proposal": p, "created_date": created_date},
+    )
+
+
+@router.get("/proposal/{proposal_id}/pdf")
+def proposal_pdf(proposal_id: int, request: Request, db: Session = Depends(get_db)):
+    user, redirect = _require_paid_or_redirect(request, db)
+    if redirect:
+        return redirect
+
+    p = (
+        db.query(Proposal)
+        .filter(Proposal.id == proposal_id, Proposal.user_id == user.id)
+        .first()
+    )
+
+    if not p:
+        return RedirectResponse("/history", status_code=303)
+
     try:
         pdf_bytes = build_proposal_pdf(
             title="Proposta Comercial",
             client_name=p.client_name or "",
             service=p.service or "",
-            deadline=p.deadline or "",  # pode ser vazio sem crash
+            deadline=p.deadline or "",
             price=p.price or "",
             proposal_text=p.proposal_text or "",
         )
     except Exception:
         logger.exception("Erro ao gerar PDF da proposta id=%s user_id=%s", p.id, user.id)
-        # deixa FastAPI devolver 500, mas com log útil
         raise
 
     filename = f"proposta_{p.id}.pdf"
@@ -367,8 +424,5 @@ def proposal_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={
-            # attachment -> força download
-            "Content-Disposition": f'attachment; filename="{filename}"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

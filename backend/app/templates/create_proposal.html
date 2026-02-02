@@ -3,214 +3,644 @@
 {% block content %}
 
 <style>
-/* ===== ESTILO PREMIUM DOS CARDS ===== */
-.preset-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
+/* ===== Layout geral ===== */
+.page-wrap{
+  max-width: 980px;
+  margin: 0 auto;
 }
 
-.preset-card {
-    border: 1px solid #e5e7eb;
-    border-radius: 14px;
-    padding: 18px;
-    background: #ffffff;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+.hero{
+  margin: 10px 0 18px 0;
+  padding: 18px 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
-.preset-card:hover {
-    border-color: #2563eb;
-    box-shadow: 0 8px 24px rgba(37,99,235,0.15);
-    transform: translateY(-3px);
+.hero h2{
+  margin: 0 0 6px 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
 }
 
-.preset-card h4 {
-    margin: 0 0 6px 0;
-    font-size: 16px;
-    font-weight: 700;
+.hero p{
+  margin: 0;
+  color: #4b5563;
+  line-height: 1.5;
+  font-size: 14px;
 }
 
-.preset-card p {
-    margin: 0 0 10px 0;
-    font-size: 13px;
-    color: #4b5563;
-    line-height: 1.4;
+.hero .hint{
+  margin-top: 10px;
+  display: inline-flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.preset-card span {
-    font-size: 11px;
-    font-weight: 600;
-    color: #2563eb;
-    background: #eff6ff;
-    padding: 4px 10px;
-    border-radius: 999px;
-    display: inline-block;
+.pill{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #111827;
+  background: #eef2ff;
+  border: 1px solid #e0e7ff;
+  padding: 6px 10px;
+  border-radius: 999px;
+}
+
+/* ===== Presets por categoria ===== */
+.preset-title{
+  margin: 18px 0 8px 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.preset-sub{
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.category{
+  margin: 14px 0 18px 0;
+}
+
+.category-header{
+  display:flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 10px 0;
+}
+
+.category-name{
+  font-size: 13px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.category-note{
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.preset-cards{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+.preset-card{
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 16px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all .18s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.preset-card:hover{
+  border-color: #2563eb;
+  box-shadow: 0 10px 26px rgba(37,99,235,0.14);
+  transform: translateY(-2px);
+}
+
+.preset-card h4{
+  margin: 0 0 6px 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.preset-card p{
+  margin: 0 0 10px 0;
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.45;
+}
+
+.preset-card .row{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.badge{
+  font-size: 11px;
+  font-weight: 700;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.small-link{
+  font-size: 12px;
+  color: #2563eb;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ===== Form / card ===== */
+.form-card{
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 18px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.form-grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 760px){
+  .form-grid{ grid-template-columns: 1fr; }
+}
+
+.section-title{
+  margin: 14px 0 8px 0;
+  font-size: 14px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.help{
+  margin: -2px 0 10px 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+label{
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 6px;
+}
+
+input[type="text"], select, textarea{
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+  background: #ffffff;
+}
+
+textarea{ resize: vertical; min-height: 88px; }
+
+input[type="text"]:focus, select:focus, textarea:focus{
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.actions{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.primary-btn{
+  appearance: none;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-weight: 900;
+  font-size: 14px;
+  cursor: pointer;
+  background: #2563eb;
+  color: white;
+  transition: transform .12s ease, box-shadow .12s ease;
+  box-shadow: 0 10px 20px rgba(37,99,235,0.18);
+}
+
+.primary-btn:hover{ transform: translateY(-1px); }
+.primary-btn:active{ transform: translateY(0px); }
+
+.secondary-btn{
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #111827;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.secondary-btn:hover{ border-color: #cbd5e1; }
+
+.error-box{
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #991b1b;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin: 10px 0 14px 0;
+  font-size: 13px;
 }
 </style>
 
-<h2>Criar Proposta</h2>
+<div class="page-wrap">
 
-{% if error %}
-    <div class="error">{{ error }}</div>
-{% endif %}
+  <div class="hero">
+    <h2>Criar proposta em minutos</h2>
+    <p>Preencha os dados abaixo e gere um texto pronto para enviar. Depois você pode salvar e baixar em PDF com aparência profissional.</p>
 
-<!-- ===== CARDS DE MODELOS (1 CLIQUE) ===== -->
-<h3>Escolha um modelo de proposta</h3>
+    <div class="hint">
+      <span class="pill">⚡ Rápido</span>
+      <span class="pill">📄 Texto pronto + PDF</span>
+      <span class="pill">✅ Visual profissional</span>
+    </div>
+  </div>
 
-<div class="preset-cards">
+  {% if error %}
+    <div class="error-box">{{ error }}</div>
+  {% endif %}
 
-    <div class="preset-card" onclick="applyPreset('social')">
-        <h4>Social Media Premium</h4>
-        <p>Contrato mensal focado em vendas</p>
-        <span>1 clique</span>
+  <div>
+    <div class="preset-title">Modelos por categoria (1 clique)</div>
+    <div class="preset-sub">Escolha um nicho, aplique o modelo e depois ajuste valor/prazo como quiser.</div>
+
+    <!-- MARKETING -->
+    <div class="category">
+      <div class="category-header">
+        <div class="category-name">Marketing</div>
+        <div class="category-note">Ideal para serviços contínuos e performance</div>
+      </div>
+      <div class="preset-cards">
+        <div class="preset-card" onclick="applyPreset('social')">
+          <h4>Social Media Premium</h4>
+          <p>Contrato mensal focado em vendas e acompanhamento contínuo.</p>
+          <div class="row">
+            <span class="badge">1 clique</span>
+            <span class="small-link">Aplicar modelo</span>
+          </div>
+        </div>
+
+        <div class="preset-card" onclick="applyPreset('trafego')">
+          <h4>Tráfego Pago</h4>
+          <p>Gestão de campanhas com otimização e foco em resultado.</p>
+          <div class="row">
+            <span class="badge">1 clique</span>
+            <span class="small-link">Aplicar modelo</span>
+          </div>
+        </div>
+
+        <div class="preset-card" onclick="applyPreset('design')">
+          <h4>Design / Criativos</h4>
+          <p>Criação de peças, identidade visual e materiais para conversão.</p>
+          <div class="row">
+            <span class="badge">1 clique</span>
+            <span class="small-link">Aplicar modelo</span>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="preset-card" onclick="applyPreset('site')">
-        <h4>Criação de Site</h4>
-        <p>Projeto fechado com prazo definido</p>
-        <span>1 clique</span>
+    <!-- WEB -->
+    <div class="category">
+      <div class="category-header">
+        <div class="category-name">Web</div>
+        <div class="category-note">Projetos com entrega definida</div>
+      </div>
+      <div class="preset-cards">
+        <div class="preset-card" onclick="applyPreset('site')">
+          <h4>Criação de Site</h4>
+          <p>Projeto com prazo definido, ideal para fechar rápido com clareza.</p>
+          <div class="row">
+            <span class="badge">1 clique</span>
+            <span class="small-link">Aplicar modelo</span>
+          </div>
+        </div>
+
+        <div class="preset-card" onclick="applyPreset('landing')">
+          <h4>Landing Page</h4>
+          <p>Página focada em conversão com estrutura direta e persuasiva.</p>
+          <div class="row">
+            <span class="badge">1 clique</span>
+            <span class="small-link">Aplicar modelo</span>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <!-- SERVIÇOS -->
+    <div class="category">
+      <div class="category-header">
+        <div class="category-name">Serviços</div>
+        <div class="category-note">Para profissionais e prestadores locais</div>
+      </div>
+      <div class="preset-cards">
+        <div class="preset-card" onclick="applyPreset('consultoria')">
+          <h4>Consultoria</h4>
+          <p>Diagnóstico + plano de ação com encontros e entrega estruturada.</p>
+          <div class="row">
+            <span class="badge">1 clique</span>
+            <span class="small-link">Aplicar modelo</span>
+          </div>
+        </div>
+
+        <div class="preset-card" onclick="applyPreset('prestador')">
+          <h4>Prestador Local</h4>
+          <p>Serviço prático com escopo claro, prazo e condições objetivas.</p>
+          <div class="row">
+            <span class="badge">1 clique</span>
+            <span class="small-link">Aplicar modelo</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RECORRENTES -->
+    <div class="category">
+      <div class="category-header">
+        <div class="category-name">Recorrentes</div>
+        <div class="category-note">Contratos mensais e pacotes</div>
+      </div>
+      <div class="preset-cards">
+        <div class="preset-card" onclick="applyPreset('mensal')">
+          <h4>Mensal</h4>
+          <p>Modelo pronto para contratos com renovação e rotina definida.</p>
+          <div class="row">
+            <span class="badge">1 clique</span>
+            <span class="small-link">Aplicar modelo</span>
+          </div>
+        </div>
+
+        <div class="preset-card" onclick="applyPreset('contrato_fechado')">
+          <h4>Contrato Fechado</h4>
+          <p>Projeto fechado com fases, entregas e critérios de aceite.</p>
+          <div class="row">
+            <span class="badge">1 clique</span>
+            <span class="small-link">Aplicar modelo</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== FORMULÁRIO (mantém names + action para bater com routes.py) ===== -->
+  <form method="post" action="/create" class="form-card">
+
+    <input type="hidden" name="preset_id" id="preset_id" value="">
+
+    <div class="section-title">Dados do cliente</div>
+    <div class="help">Esses dados aparecem no topo da proposta e ajudam a personalizar.</div>
+
+    <div class="form-grid">
+      <div>
+        <label>Nome do cliente</label>
+        <input type="text" name="client_name" id="client_name" placeholder="Ex.: Mariana Oliveira" required>
+      </div>
+
+      <div>
+        <label>Serviço</label>
+        <input type="text" name="service" id="service" value="Gestão de Social Media Premium" placeholder="Ex.: Criação de Site Profissional" required>
+      </div>
+    </div>
+
+    <div class="section-title">Detalhes do serviço</div>
+    <div class="help">Quanto mais claro o escopo, melhor fica o texto final.</div>
+
+    <div>
+      <label>Escopo</label>
+      <textarea name="scope" id="scope" placeholder="Descreva o que está incluído (ex.: posts, stories, atendimento, páginas do site, integrações, etc.)" required></textarea>
+    </div>
+
+    <div class="form-grid" style="margin-top: 14px;">
+      <div>
+        <label>Prazo</label>
+        <input type="text" name="deadline" id="deadline" placeholder="Ex.: 15 dias / 30 dias / 3 meses" required>
+      </div>
+
+      <div>
+        <label>Investimento (valor)</label>
+        <input type="text" name="price" id="price" placeholder="Ex.: R$ 1.500,00" required>
+      </div>
+    </div>
+
+    <div class="section-title">Condições e diferenciais</div>
+    <div class="help">Essas informações deixam a proposta mais persuasiva e completa.</div>
+
+    <div>
+      <label>Condições de pagamento</label>
+      <input type="text" name="payment_terms" id="payment_terms" placeholder="Ex.: 50% na entrada e 50% na entrega" required>
+    </div>
+
+    <div class="form-grid" style="margin-top: 14px;">
+      <div>
+        <label>Diferenciais</label>
+        <textarea name="differentiators" id="differentiators" placeholder="Ex.: foco em conversão, relatórios, estratégia, acompanhamento, otimização contínua" required></textarea>
+      </div>
+
+      <div>
+        <label>Garantia / Suporte</label>
+        <textarea name="warranty_support" id="warranty_support" placeholder="Ex.: suporte por 30 dias após entrega, ajustes inclusos, acompanhamento semanal" required></textarea>
+      </div>
+    </div>
+
+    <div class="section-title">Tom e objetivo</div>
+    <div class="help">Ajuste a linguagem da proposta para o tipo de cliente e intenção.</div>
+
+    <div class="form-grid">
+      <div>
+        <label>Tom</label>
+        <select name="tone" id="tone" required>
+          <option value="profissional" selected>Profissional</option>
+          <option value="direto">Direto</option>
+          <option value="consultivo">Consultivo</option>
+          <option value="premium">Premium</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Objetivo</label>
+        <select name="objective" id="objective" required>
+          <option value="fechar" selected>Fechar a proposta</option>
+          <option value="agendar">Agendar reunião</option>
+          <option value="prospeccao">Prospecção</option>
+          <option value="renovacao">Renovação</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="primary-btn">Gerar proposta</button>
+      <a href="/history" class="secondary-btn" style="text-decoration:none; display:inline-block;">Ver histórico</a>
+    </div>
+
+  </form>
 
 </div>
 
-<!-- ===== FORMULÁRIO (NÃO QUEBRADO) ===== -->
-<form method="post" action="/create" class="card">
-
-    <h3>Dados do Cliente</h3>
-
-    <label>
-        Nome do cliente
-        <input type="text" name="client_name" required>
-    </label>
-
-    <label>
-        Serviço
-        <input
-            type="text"
-            name="service"
-            value="Gestão de Social Media Premium"
-            required
-        >
-    </label>
-
-    <h3>Detalhes do Serviço</h3>
-
-    <label>
-        Escopo do serviço
-        <textarea name="scope" rows="4">
-Planejamento estratégico, criação de conteúdo, gestão de redes sociais e acompanhamento mensal focado em vendas.
-        </textarea>
-    </label>
-
-    <label>
-        Prazo
-        <input
-            type="text"
-            name="deadline"
-            value="Contrato mensal"
-        >
-    </label>
-
-    <label>
-        Preço / Investimento
-        <input
-            type="text"
-            name="price"
-            value="R$ 1.500 / mês"
-        >
-    </label>
-
-    <label>
-        Condições de pagamento
-        <input
-            type="text"
-            name="payment_terms"
-            value="Mensalidade antecipada"
-        >
-    </label>
-
-    <h3>Argumentos de Venda</h3>
-
-    <label>
-        Diferenciais
-        <textarea name="differentiators" rows="3">
-Estratégia focada em conversão, conteúdo profissional e acompanhamento próximo dos resultados.
-        </textarea>
-    </label>
-
-    <label>
-        Garantia / Suporte
-        <textarea name="warranty_support" rows="3">
-Suporte contínuo durante o contrato e ajustes estratégicos conforme desempenho.
-        </textarea>
-    </label>
-
-    <h3>Estilo da Proposta</h3>
-
-    <label>
-        Tom da comunicação
-        <select name="tone">
-            <option value="direto" selected>Direto</option>
-            <option value="formal">Formal</option>
-            <option value="amigável">Amigável</option>
-        </select>
-    </label>
-
-    <label>
-        Objetivo da proposta
-        <select name="objective">
-            <option value="fechar rápido" selected>Fechar rápido</option>
-            <option value="qualificar">Qualificar</option>
-            <option value="alto ticket">Alto ticket</option>
-        </select>
-    </label>
-
-    <button type="submit">Gerar Proposta</button>
-
-</form>
-
-<!-- ===== SCRIPT DOS CARDS ===== -->
 <script>
-function applyPreset(type) {
+  // Presets vindos do backend (routes.py passa {"presets": PRESETS})
+  const PRESETS = {{ presets | default({}) | tojson }};
 
-    if (type === 'social') {
-        document.querySelector('[name="service"]').value =
-            'Gestão de Social Media Premium';
+  function setField(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if ((el.value || '').trim() === '') {
+      el.value = value || '';
+    }
+  }
 
-        document.querySelector('[name="scope"]').value =
-            'Planejamento estratégico, criação de conteúdo, gestão de redes sociais e acompanhamento mensal focado em vendas.';
+  function applyPreset(presetId) {
+    document.getElementById('preset_id').value = presetId;
 
-        document.querySelector('[name="deadline"]').value =
-            'Contrato mensal';
+    const p = (PRESETS && PRESETS[presetId]) ? PRESETS[presetId] : null;
 
-        document.querySelector('[name="price"]').value =
-            'R$ 1.500 / mês';
+    // 1) Se existir no backend, usa os campos do preset de verdade
+    if (p) {
+      setField('service', p.service);
+      setField('scope', p.scope);
+      setField('deadline', p.deadline);
+      setField('price', p.price);
+      setField('payment_terms', p.payment_terms);
+      setField('differentiators', p.differentiators);
+      setField('warranty_support', p.warranty_support);
 
-        document.querySelector('[name="payment_terms"]').value =
-            'Mensalidade antecipada';
+      if (p.tone) document.getElementById('tone').value = p.tone;
+      if (p.objective) document.getElementById('objective').value = p.objective;
+      return;
     }
 
-    if (type === 'site') {
-        document.querySelector('[name="service"]').value =
-            'Criação de Site Profissional';
+    // 2) Fallback (não quebra se você ainda não criou esses presets no backend)
+    // Você pode deixar assim por enquanto e depois criar os presets no PRESETS.
+    const FALLBACK = {
+      social: {
+        service: 'Gestão de Social Media Premium',
+        scope: 'Planejamento, criação de posts e stories, acompanhamento e otimização para vendas.',
+        deadline: '30 dias',
+        price: 'R$ 1.500,00',
+        payment_terms: 'Mensal (pagamento antecipado).',
+        differentiators: 'Foco em conversão, relatórios e acompanhamento contínuo.',
+        warranty_support: 'Suporte durante todo o período contratado.',
+        tone: 'profissional',
+        objective: 'fechar'
+      },
+      site: {
+        service: 'Criação de Site Profissional',
+        scope: 'Site institucional com páginas essenciais, formulário de contato e responsivo.',
+        deadline: '15 dias',
+        price: 'R$ 2.500,00',
+        payment_terms: '50% na entrada e 50% na entrega.',
+        differentiators: 'Design moderno, performance e foco em clareza comercial.',
+        warranty_support: 'Suporte por 30 dias após entrega, com ajustes simples.',
+        tone: 'profissional',
+        objective: 'fechar'
+      },
+      trafego: {
+        service: 'Gestão de Tráfego Pago',
+        scope: 'Configuração e gestão de campanhas, otimização, testes e acompanhamento de desempenho.',
+        deadline: '30 dias',
+        price: 'R$ 1.200,00',
+        payment_terms: 'Mensal (pagamento antecipado).',
+        differentiators: 'Otimização contínua, foco em ROI e relatórios periódicos.',
+        warranty_support: 'Suporte durante o período contratado.',
+        tone: 'profissional',
+        objective: 'fechar'
+      },
+      design: {
+        service: 'Design / Criativos',
+        scope: 'Criação de artes e peças para redes sociais/anúncios, com revisões combinadas.',
+        deadline: '7 dias',
+        price: 'R$ 800,00',
+        payment_terms: '50% na entrada e 50% na entrega.',
+        differentiators: 'Criativos orientados à conversão, consistência visual e agilidade.',
+        warranty_support: 'Ajustes simples por 7 dias após entrega.',
+        tone: 'profissional',
+        objective: 'fechar'
+      },
+      landing: {
+        service: 'Landing Page (Conversão)',
+        scope: 'Landing page com estrutura persuasiva, responsiva e pronta para captação/leads.',
+        deadline: '10 dias',
+        price: 'R$ 1.800,00',
+        payment_terms: '50% na entrada e 50% na entrega.',
+        differentiators: 'Foco em conversão, copy clara e performance.',
+        warranty_support: 'Suporte por 15 dias após entrega.',
+        tone: 'profissional',
+        objective: 'fechar'
+      },
+      consultoria: {
+        service: 'Consultoria',
+        scope: 'Diagnóstico, plano de ação e encontros para orientar execução e resultados.',
+        deadline: '15 dias',
+        price: 'R$ 1.000,00',
+        payment_terms: 'Pagamento antecipado.',
+        differentiators: 'Plano prático, acompanhamento e direcionamento estratégico.',
+        warranty_support: 'Suporte por 15 dias após entrega.',
+        tone: 'consultivo',
+        objective: 'agendar'
+      },
+      prestador: {
+        service: 'Serviço Local (Prestador)',
+        scope: 'Execução do serviço conforme escopo combinado, com prazos e condições definidas.',
+        deadline: '7 dias',
+        price: 'R$ 600,00',
+        payment_terms: '50% na entrada e 50% na entrega.',
+        differentiators: 'Agilidade, transparência e qualidade na entrega.',
+        warranty_support: 'Garantia conforme combinado.',
+        tone: 'direto',
+        objective: 'fechar'
+      },
+      mensal: {
+        service: 'Contrato Mensal (Recorrente)',
+        scope: 'Prestação contínua do serviço com rotina definida e entregas mensais.',
+        deadline: '30 dias',
+        price: 'R$ 1.000,00',
+        payment_terms: 'Mensal (pagamento antecipado).',
+        differentiators: 'Consistência, acompanhamento e melhoria contínua.',
+        warranty_support: 'Suporte durante todo o período contratado.',
+        tone: 'profissional',
+        objective: 'fechar'
+      },
+      contrato_fechado: {
+        service: 'Projeto (Contrato Fechado)',
+        scope: 'Projeto fechado com fases, entregas, critérios de aceite e prazos definidos.',
+        deadline: '20 dias',
+        price: 'R$ 3.000,00',
+        payment_terms: '40% na entrada, 30% no meio e 30% na entrega.',
+        differentiators: 'Organização por fases, clareza de entrega e segurança comercial.',
+        warranty_support: 'Suporte por 30 dias após entrega.',
+        tone: 'profissional',
+        objective: 'fechar'
+      }
+    };
 
-        document.querySelector('[name="scope"]').value =
-            'Desenvolvimento de site responsivo, rápido e otimizado para conversão.';
+    const f = FALLBACK[presetId];
+    if (!f) return;
 
-        document.querySelector('[name="deadline"]').value =
-            '15 dias';
+    setField('service', f.service);
+    setField('scope', f.scope);
+    setField('deadline', f.deadline);
+    setField('price', f.price);
+    setField('payment_terms', f.payment_terms);
+    setField('differentiators', f.differentiators);
+    setField('warranty_support', f.warranty_support);
 
-        document.querySelector('[name="price"]').value =
-            'R$ 2.500';
-
-        document.querySelector('[name="payment_terms"]').value =
-            '50% na entrada + 50% na entrega';
-    }
-
-}
+    if (f.tone) document.getElementById('tone').value = f.tone;
+    if (f.objective) document.getElementById('objective').value = f.objective;
+  }
 </script>
 
 {% endblock %}

@@ -5,95 +5,286 @@
 {# Preço com fallback seguro: se não vier do backend, mantém 29,90 #}
 {% set _price = paywall_price_brl if paywall_price_brl is defined and paywall_price_brl else "29,90" %}
 
-<div class="page">
-  <div class="container">
-    <div class="card">
-      <div class="card-header">
-        <h1 class="title">Liberar acesso ao Gerador de Propostas</h1>
-        <p class="subtitle">
-          Gere propostas profissionais em minutos — com texto pronto pra copiar e PDF bonito.
-        </p>
-      </div>
+<style>
+.page-wrap{
+  max-width: 980px;
+  margin: 0 auto;
+}
 
-      <div class="card-body">
+.shell{
+  max-width: 780px;
+  margin: 0 auto;
+}
 
-        <div class="alert alert-warning" style="margin-bottom: 16px;">
-          <strong>Status:</strong> acesso pendente
-        </div>
+.hero{
+  margin: 10px 0 14px 0;
+  padding: 18px 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
 
-        <p style="margin: 0 0 18px 0;">
-          <strong>Sua conta:</strong> {{ user.email }}
-        </p>
+.hero h1{
+  margin: 0 0 6px 0;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.2px;
+}
 
-        {# Debug opcional: aparece só se o backend passar debug_payments=True #}
-        {% if debug_payments %}
-          <div class="alert alert-info" style="margin-bottom: 16px;">
-            <strong>DEBUG_PAYMENTS:</strong> user_id={{ user.id }}
-            {% if checkout_url %}
-              <div style="margin-top: 6px; font-size: 12px; opacity: .8; word-break: break-all;">
-                checkout_url={{ checkout_url }}
-              </div>
-            {% endif %}
-          </div>
-        {% endif %}
+.hero p{
+  margin: 0;
+  color: #4b5563;
+  line-height: 1.5;
+  font-size: 14px;
+}
 
-        <div class="card" style="padding: 18px; border-radius: 14px; margin-bottom: 18px;">
-          <div style="font-weight: 700; letter-spacing: .04em; text-transform: uppercase; opacity: .8; margin-bottom: 10px;">
-            O que você recebe
-          </div>
+.status{
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 900;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
 
-          <ul style="line-height: 1.7; margin: 0 0 12px 18px;">
-            <li>Texto de proposta pronto pra copiar e colar (WhatsApp, email ou Direct)</li>
-            <li>PDF profissional com “cara de empresa”</li>
-            <li>Histórico salvo por cliente pra reutilizar depois</li>
-          </ul>
+.grid{
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 14px;
+}
 
-          <div style="margin-top: 12px; opacity: .85;">
-            Pagamento único • acesso imediato
-          </div>
+@media (max-width: 860px){
+  .grid{ grid-template-columns: 1fr; }
+}
 
-          <div style="font-size: 44px; font-weight: 800; margin: 8px 0 14px 0;">
-            R$ {{ _price }}
-          </div>
+.box{
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 18px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
 
-          <div style="display:flex; gap:12px; flex-wrap: wrap;">
-            {% if checkout_url %}
-              {# ✅ NÃO anexar user_id aqui (já vai pronto do backend). Isso evita duplicar user_id=user_id=... #}
-              <a class="btn btn-primary"
-                 href="{{ checkout_url }}"
-                 target="_blank"
-                 rel="noopener noreferrer"
-                 style="min-width: 260px; text-align:center;">
-                Liberar acesso agora — R$ {{ _price }}
-              </a>
-            {% else %}
-              <button class="btn btn-primary" disabled
-                      style="min-width: 260px; text-align:center; opacity:.6;">
-                Checkout indisponível
-              </button>
-            {% endif %}
+.kicker{
+  font-size: 11px;
+  font-weight: 900;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 10px;
+}
 
-            <a class="btn btn-secondary" href="/logout">
-              Sair
-            </a>
-          </div>
+.list{
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.7;
+  color: #111827;
+  font-size: 14px;
+}
 
-          <p style="margin-top: 14px; color: var(--muted); font-size: 14px;">
-            Em menos de 2 minutos você cria e envia uma proposta organizada que passa confiança.
-          </p>
-        </div>
+.muted{
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 10px;
+}
 
-        <div class="card" style="padding: 16px; border-radius: 14px;">
-          <div style="font-weight: 700; margin-bottom: 8px;">
-            Quando vale a pena?
-          </div>
-          <p style="margin:0; line-height: 1.6;">
-            Quando o cliente pede proposta “pra hoje” e você quer responder rápido, com clareza e aparência profissional — sem travar escrevendo.
-          </p>
-        </div>
+.price{
+  font-size: 44px;
+  font-weight: 900;
+  margin: 6px 0 8px 0;
+  letter-spacing: -0.5px;
+  color: #111827;
+}
 
-      </div>
+.subprice{
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+.badges{
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.badge{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #111827;
+  background: #eef2ff;
+  border: 1px solid #e0e7ff;
+  padding: 6px 10px;
+  border-radius: 999px;
+}
+
+.actions{
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.btn-primary{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-weight: 900;
+  font-size: 14px;
+  cursor: pointer;
+  background: #2563eb;
+  color: #ffffff;
+  min-width: 280px;
+  text-align: center;
+  box-shadow: 0 10px 20px rgba(37,99,235,0.18);
+  transition: transform .12s ease;
+  text-decoration: none;
+}
+
+.btn-primary:hover{ transform: translateY(-1px); }
+.btn-primary:active{ transform: translateY(0); }
+
+.btn-secondary{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #111827;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-weight: 900;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn-secondary:hover{ border-color: #cbd5e1; }
+
+.smallnote{
+  margin-top: 12px;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.hr{
+  height: 1px;
+  background: #e5e7eb;
+  margin: 14px 0;
+}
+</style>
+
+<div class="page-wrap">
+  <div class="shell">
+
+    <div class="hero">
+      <h1>Baixe sua proposta em PDF profissional agora</h1>
+      <p>Você já gerou sua proposta. Falta apenas liberar o acesso para baixar o PDF e enviar ao cliente com aparência profissional.</p>
+      <div class="status">🔒 Acesso ainda não liberado</div>
     </div>
+
+    {# Debug opcional: aparece só se o backend passar debug_payments=True #}
+    {% if debug_payments %}
+      <div class="box" style="margin-bottom: 14px; border-color:#bae6fd;">
+        <div class="kicker">Debug</div>
+        <div style="font-size: 13px;">
+          <strong>DEBUG_PAYMENTS:</strong> user_id={{ user.id }}
+          {% if checkout_url %}
+            <div style="margin-top: 6px; font-size: 12px; opacity: .85; word-break: break-all;">
+              checkout_url={{ checkout_url }}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="grid">
+
+      <!-- Esquerda: benefícios -->
+      <div class="box">
+        <div class="kicker">O que você libera ao pagar</div>
+        <ul class="list">
+          <li><strong>PDF com “cara de empresa”</strong> pronto para enviar</li>
+          <li><strong>Texto pronto</strong> para copiar e mandar no WhatsApp/email</li>
+          <li><strong>Histórico salvo</strong> por cliente para reutilizar depois</li>
+          <li><strong>Mais rapidez</strong> para responder e passar confiança</li>
+        </ul>
+
+        <div class="hr"></div>
+
+        <div class="kicker">Sua conta</div>
+        <div style="font-size: 14px; font-weight: 900; color:#111827;">
+          {{ user.email }}
+        </div>
+
+        <p class="muted">
+          Muitas vendas se perdem por demora ou proposta mal organizada. Com o PDF pronto, você responde rápido e transmite profissionalismo.
+        </p>
+      </div>
+
+      <!-- Direita: preço + CTA -->
+      <div class="box">
+        <div class="kicker">Acesso completo</div>
+
+        <div class="price">R$ {{ _price }}</div>
+        <div class="subprice">
+          Pagamento único • Sem mensalidade • Acesso imediato após a confirmação
+        </div>
+
+        <div class="badges">
+          <span class="badge">🔒 Pagamento seguro</span>
+          <span class="badge">⚡ Liberação rápida</span>
+          <span class="badge">📄 PDF profissional</span>
+        </div>
+
+        <div class="actions">
+          {% if checkout_url %}
+            {# ✅ NÃO anexar user_id aqui (já vai pronto do backend). Isso evita duplicar user_id=user_id=... #}
+            <a class="btn-primary"
+               href="{{ checkout_url }}"
+               target="_blank"
+               rel="noopener noreferrer">
+              📄 Liberar acesso e baixar meu PDF
+            </a>
+          {% else %}
+            <button class="btn-primary" disabled style="opacity:.6; cursor:not-allowed;">
+              Checkout indisponível
+            </button>
+          {% endif %}
+
+          <a class="btn-secondary" href="/logout">Sair</a>
+        </div>
+
+        <div class="smallnote">
+          ✅ Em poucos minutos você cria e envia uma proposta organizada que passa confiança.
+        </div>
+      </div>
+
+    </div>
+
+    <div class="box" style="margin-top: 14px;">
+      <div class="kicker">Quando vale a pena?</div>
+      <p style="margin:0; line-height:1.6; color:#111827; font-size:14px;">
+        Quando o cliente pede proposta “pra hoje” e você quer responder rápido, com clareza e aparência profissional — sem travar escrevendo.
+      </p>
+    </div>
+
   </div>
 </div>
 
