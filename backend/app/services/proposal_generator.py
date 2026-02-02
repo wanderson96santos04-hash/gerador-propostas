@@ -6,54 +6,68 @@ import re
 from app.config import settings
 
 
+NEXT_STEPS_BLOCK = (
+    "Próximos passos\n"
+    "- Aprovação desta proposta\n"
+    "- Confirmação das condições comerciais\n"
+    "- Agendamento da reunião inicial"
+)
+
+
+def _normalize(text: str) -> str:
+    t = (text or "")
+    t = t.replace("\r\n", "\n").replace("\r", "\n").replace("\u00a0", " ")
+    return t
+
+
 def sanitize_proposal_text(text: str) -> str:
     """
     Sanitização SEM assinatura:
     - Remove colchetes [ ... ]
-    - Remove qualquer trecho após 'Próximos passos'
-    - Remove frases de fechamento humanas
+    - Remove assinaturas (Atenciosamente/Cordialmente etc.) caso apareçam
+    - NÃO corta o texto antes de "Próximos passos" (isso é tratado fora)
     - NÃO adiciona assinatura
     """
     if not text:
         return ""
 
-    t = (text or "")
-    t = t.replace("\r\n", "\n").replace("\r", "\n").replace("\u00a0", " ").strip()
+    t = _normalize(text).strip()
 
-    # remove colchetes
+    # remove colchetes / placeholders
     t = re.sub(r"\[.*?\]", "", t, flags=re.DOTALL).strip()
 
-    # corta tudo após "Próximos passos"
-    t = re.split(
-        r"(?is)(\*\*próximos passos\*\*|##\s*próximos passos|próximos passos)\s*:?",
-        t,
-        maxsplit=1,
-    )[0].strip()
+    # remove qualquer bloco de assinatura se aparecer (do último marcador até o fim)
+    # (somente assinatura/fechamento, não corta o corpo inteiro)
+    sig_pattern = re.compile(
+        r"(?is)\n\s*(atenciosamente|cordialmente|assinado|att\.?)\b.*$"
+    )
+    t = re.sub(sig_pattern, "", t).strip()
 
-    # remove frases humanas / assinatura acidental
-    forbidden_markers = [
-        "atenciosamente",
-        "cordialmente",
-        "assinado",
-        "estou à disposição",
-        "fico à disposição",
-        "qualquer dúvida",
-        "entre em contato",
-        "aguardo retorno",
-        "emitido em",
-        "prezado",
-        "prezada",
-    ]
-
-    lower = t.lower()
-    for marker in forbidden_markers:
-        idx = lower.rfind(marker)
-        if idx != -1:
-            t = t[:idx]
-            lower = t.lower()
+    # limpa pontas comuns
+    t = t.rstrip(" \n\r-—•")
 
     # limpa quebras duplicadas
     t = re.sub(r"\n{3,}", "\n\n", t).strip()
+
+    return t
+
+
+def remove_next_steps_and_below(text: str) -> str:
+    """
+    Remove qualquer 'Próximos passos' existente e tudo que vem depois,
+    pra evitar duplicar ou ficar '9.' solto no final.
+    """
+    if not text:
+        return ""
+
+    t = _normalize(text)
+
+    # pega "Próximos passos" com variações (com numeração, markdown, etc.)
+    # e remove tudo dali pra baixo
+    pattern = re.compile(
+        r"(?is)\n\s*(\d+\.\s*)?(\*\*)?(##\s*)?próximos passos(\*\*)?\s*:?.*$"
+    )
+    t = re.sub(pattern, "", t).strip()
 
     return t
 
@@ -135,8 +149,7 @@ def apply_value_framing(text: str, price: str, objective: str) -> str:
 
 def apply_smart_closing(text: str, tone: str) -> str:
     """
-    Fechamento NEUTRO.
-    Nada de assinatura, nada de frase humana.
+    Fechamento NEUTRO (sem assinatura).
     """
     closings = {
         "formal": "Após a aprovação desta proposta, serão alinhados os próximos passos para início da execução.",
@@ -152,11 +165,24 @@ def apply_smart_closing(text: str, tone: str) -> str:
     return f"{text}\n\n{closing}"
 
 
+def apply_next_steps(text: str) -> str:
+    """
+    Garante o final padrão com Próximos passos (sem duplicação).
+    """
+    base = remove_next_steps_and_below(text)
+    base = sanitize_proposal_text(base)
+
+    if not base:
+        return NEXT_STEPS_BLOCK
+
+    return f"{base}\n\n{NEXT_STEPS_BLOCK}"
+
+
 def _stub_generate(data: Dict[str, str]) -> str:
     service = (data.get("service") or "Serviço").strip()
 
     return (
-        f"Proposta Comercial\n\n"
+        "Proposta Comercial\n\n"
         f"Segue proposta comercial para a prestação do serviço de {service}, "
         "contemplando escopo, prazos e condições conforme descrito a seguir."
     )
@@ -171,10 +197,11 @@ def generate_proposal_text(data: Dict[str, str]) -> str:
     else:
         raw = _stub_generate(data)
 
-    # ordem correta
+    # ordem correta (mantém o que já funciona)
     raw = apply_scope_guardrails(raw, data.get("scope") or "")
     raw = apply_revision_policy(raw, data.get("tone") or "")
     raw = apply_value_framing(raw, data.get("price") or "", data.get("objective") or "")
     raw = apply_smart_closing(raw, data.get("tone") or "")
 
-    return sanitize_proposal_text(raw)
+    # FINAL: força Próximos passos padrão e elimina duplicações
+    return apply_next_steps(raw)
