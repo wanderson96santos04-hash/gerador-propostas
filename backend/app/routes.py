@@ -25,7 +25,7 @@ router = APIRouter()
 FINAL_SIGNATURE = "Atenciosamente,\nEquipe Comercial"
 logger = logging.getLogger(__name__)
 
-# ===== PASSO 1 (Mudança A): marcador simples para provar origem da geração =====
+# ===== marcador simples para provar origem da geração =====
 _LAST_GEN = {"used": "unknown"}  # "openai" | "local" | "unknown"
 
 
@@ -72,9 +72,9 @@ def _sanitize_proposal_text(text: str) -> str:
     """
     Sanitização final:
     - remove [ ... ]
-    - remove tudo após "Próximos passos"
-    - remove assinaturas duplicadas
-    - garante assinatura final fixa
+    - remove tudo após "Próximos passos" (se existir)
+    - remove QUALQUER assinatura / despedida no final
+    - garante assinatura final fixa (UMA VEZ)
     """
     if not text:
         return FINAL_SIGNATURE
@@ -85,14 +85,14 @@ def _sanitize_proposal_text(text: str) -> str:
     # remove colchetes
     t = re.sub(r"\[.*?\]", "", t, flags=re.DOTALL).strip()
 
-    # remove tudo após "próximos passos"
+    # remove tudo após "próximos passos" (se GPT inventar algo depois)
     t = re.split(
         r"(?is)(\*\*próximos passos\*\*|##\s*próximos passos|próximos passos)",
         t,
         maxsplit=1,
     )[0].strip()
 
-    # remove assinaturas no final
+    # normalização
     def _norm(s: str) -> str:
         s = (s or "").replace("\u00a0", " ").strip().lower()
         s = re.sub(r"\s+", " ", s)
@@ -104,6 +104,7 @@ def _sanitize_proposal_text(text: str) -> str:
         while lines and _norm(lines[-1]) == "":
             lines.pop()
 
+    # captura variações comuns de assinatura / despedida
     def _is_atenciosamente(line: str) -> bool:
         return re.fullmatch(r"atenciosamente\s*[,:\-]?", _norm(line)) is not None
 
@@ -116,25 +117,42 @@ def _sanitize_proposal_text(text: str) -> str:
             _norm(line),
         ) is not None
 
+    # remove também "cordialmente", "att", etc, se vier no final
+    def _is_generic_closing(line: str) -> bool:
+        return _norm(line) in {
+            "cordialmente",
+            "att",
+            "atts",
+            "at.",
+            "att.",
+            "grato",
+            "grata",
+            "obrigado",
+            "obrigada",
+        }
+
     _pop_blank_end()
 
+    # remove tudo que pareça assinatura no final (em loop, porque pode vir repetido)
     while True:
         _pop_blank_end()
         if not lines:
             break
 
-        if _is_both(lines[-1]):
+        last = lines[-1]
+
+        if _is_both(last) or _is_generic_closing(last):
             lines.pop()
             continue
 
-        if _is_equipe(lines[-1]):
+        if _is_equipe(last):
             lines.pop()
             _pop_blank_end()
             if lines and _is_atenciosamente(lines[-1]):
                 lines.pop()
             continue
 
-        if _is_atenciosamente(lines[-1]):
+        if _is_atenciosamente(last):
             lines.pop()
             continue
 
@@ -146,6 +164,7 @@ def _sanitize_proposal_text(text: str) -> str:
     if not t:
         return FINAL_SIGNATURE
 
+    # backend sempre coloca UMA assinatura fixa
     return f"{t}\n\n{FINAL_SIGNATURE}".strip()
 
 
@@ -182,7 +201,7 @@ def _build_ai_prompt(data: dict) -> str:
 Você é um especialista em PROPOSTAS COMERCIAIS para serviços (marketing, tráfego pago, social media, design, web, consultoria e prestação de serviços).
 
 TAREFA:
-Gerar uma PROPOSTA COMERCIAL completa em PT-BR, pronta para envio, com linguagem profissional, objetiva e sem repetição de frases genéricas.
+Gerar uma PROPOSTA COMERCIAL completa em PT-BR, pronta para envio, com linguagem profissional, objetiva e específica ao serviço e escopo informados.
 
 REGRAS ABSOLUTAS:
 1) Proibido: colchetes, placeholders, "insira", "exemplo", "lorem ipsum".
@@ -206,10 +225,12 @@ ESTRUTURA OBRIGATÓRIA (seções curtas):
 8. Garantia / Suporte (usar o campo; se vazio, 1 parágrafo curto padrão)
 9. Próximos passos (3 bullets curtos)
 
-ENCERRAMENTO:
+ENCERRAMENTO (REGRA CRÍTICA):
 - NÃO escreva assinatura.
 - É PROIBIDO escrever “Atenciosamente” em qualquer parte do texto.
+- Não escreva despedidas como “Cordialmente”, “Att”, etc.
 - Termine o texto imediatamente após a seção "Próximos passos".
+- Não escreva nada após finalizar "Próximos passos".
 
 DADOS PARA USAR (não invente outros):
 - Cliente: {client}
@@ -225,7 +246,6 @@ DADOS PARA USAR (não invente outros):
 
 IMPORTANTE:
 - Se houver conflito entre Serviço e Escopo, trate o SERVIÇO como o nome principal e use o ESCOPO como entregáveis.
-- Não escreva nada após finalizar "Próximos passos".
 
 Agora gere somente o texto final da proposta.
 """.strip()
@@ -269,7 +289,6 @@ def _generate_with_openai_if_available(data: dict):
             .strip()
         )
 
-        # ===== PASSO 1 (Mudança A): marca que veio do OpenAI =====
         if text:
             _LAST_GEN["used"] = "openai"
 
@@ -344,17 +363,16 @@ def create_action(
             if key in preset and not data.get(key):
                 data[key] = (preset.get(key) or "").strip()
 
-    # ===== SUBSTITUIÇÃO (mesma lógica, só adiciona LOG) =====
+    # geração GPT / fallback
     text = _generate_with_openai_if_available(data)
     if text:
         logger.info("GPT OK ✅ Proposta gerada pelo OpenAI.")
     else:
-        # ===== PASSO 1 (Mudança A): marca fallback local =====
         _LAST_GEN["used"] = "local"
-
         logger.warning("GPT OFF ⚠️ Caindo no gerador padrão (fallback).")
         text = generate_proposal_text(data)
 
+    # sanitização final (inclui assinatura fixa UMA VEZ)
     text = _sanitize_proposal_text(text)
 
     p = Proposal(
@@ -381,7 +399,6 @@ def create_action(
     except Exception:
         created_date = str(p.created_at) if p.created_at else ""
 
-    # ===== PASSO 1 (Mudança A): devolve header na resposta HTML =====
     resp = request.app.state.templates.TemplateResponse(
         "result.html",
         {"request": request, "user": user, "proposal": p, "created_date": created_date},
@@ -474,5 +491,5 @@ def proposal_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename=\"{filename}\"'},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
