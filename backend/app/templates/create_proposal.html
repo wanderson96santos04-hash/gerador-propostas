@@ -413,7 +413,7 @@ input[type="text"]:focus, select:focus, textarea:focus{
 
       <div>
         <label>Serviço</label>
-        <input type="text" name="service" id="service" value="Gestão de Social Media Premium" placeholder="Ex.: Criação de Site Profissional" required>
+        <input type="text" name="service" id="service" placeholder="Ex.: Criação de Site Profissional" required>
       </div>
     </div>
 
@@ -643,4 +643,12 @@ input[type="text"]:focus, select:focus, textarea:focus{
   }
 </script>
 
+<!--
+TESTE
+1) Rode o backend e abra /create no navegador.
+2) Verifique que o campo "Serviço" inicia VAZIO.
+3) Clique em um card (ex.: "Social Media Premium") -> o campo "Serviço" deve ser preenchido com o valor do modelo.
+4) Clique em outro modelo com "Serviço" ainda vazio (ou apague o conteúdo e clique) -> deve preencher conforme o modelo escolhido.
+O esperado: não vir mais "Gestão de Social Media Premium" pré-preenchido ao entrar na página; o preenchimento acontece ao aplicar um modelo.
+-->
 {% endblock %}
