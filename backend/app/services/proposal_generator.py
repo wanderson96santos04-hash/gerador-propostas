@@ -36,10 +36,11 @@ def sanitize_proposal_text(text: str) -> str:
     # remove colchetes / placeholders
     t = re.sub(r"\[.*?\]", "", t, flags=re.DOTALL).strip()
 
-    # remove qualquer bloco de assinatura se aparecer (do último marcador até o fim)
-    # (somente assinatura/fechamento, não corta o corpo inteiro)
+    # remove qualquer bloco de assinatura se aparecer (do marcador até o fim)
+    # Aceita assinatura no início de uma linha OU no início do texto
     sig_pattern = re.compile(
-        r"(?is)\n\s*(atenciosamente|cordialmente|assinado|att\.?)\b.*$"
+        r"(?is)(?:^|\n)\s*(atenciosamente|cordialmente|assinado|att\.?)\b.*$",
+        re.MULTILINE,
     )
     t = re.sub(sig_pattern, "", t).strip()
 
@@ -63,9 +64,10 @@ def remove_next_steps_and_below(text: str) -> str:
     t = _normalize(text)
 
     # pega "Próximos passos" com variações (com numeração, markdown, etc.)
-    # e remove tudo dali pra baixo
+    # e remove tudo dali pra baixo (aceita início de linha OU início do texto)
     pattern = re.compile(
-        r"(?is)\n\s*(\d+\.\s*)?(\*\*)?(##\s*)?próximos passos(\*\*)?\s*:?.*$"
+        r"(?is)(?:^|\n)\s*(\d+\.\s*)?(\*\*)?(##\s*)?próximos passos(\*\*)?\s*:?.*$",
+        re.MULTILINE,
     )
     t = re.sub(pattern, "", t).strip()
 

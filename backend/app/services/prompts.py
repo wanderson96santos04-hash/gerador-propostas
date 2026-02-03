@@ -107,9 +107,13 @@ FORMATO OBRIGATÓRIO (sem markdown pesado; apenas títulos simples)
 7) Investimento (valor + o que inclui; se não houver valor, não inventar)
 8) Condições de pagamento (seguir regra acima)
 9) Garantia / Suporte (seguir regra acima)
-10) Próximos passos (3 bullets curtos)
+10) Próximos passos (use exatamente estes 3 bullets, nesta ordem e com este texto):
+Próximos passos
+- Aprovação desta proposta
+- Confirmação das condições comerciais
+- Agendamento da reunião inicial
 
 ENCERRAMENTO
-- Termine o texto IMEDIATAMENTE após "Próximos passos".
+- Termine o texto IMEDIATAMENTE após esses 3 bullets de "Próximos passos".
 - Não escreva mais nada depois.
 """.strip()
