@@ -204,32 +204,8 @@ textarea:focus{
   <div class="card-clean">
     <h3>Texto da proposta</h3>
 
-    {# 🔒 PORTÃO FINAL: corta tudo após "Próximos passos" (com variações) #}
-    {% set t = proposal.proposal_text %}
-    {% set t = t.split('Próximos passos')[0] %}
-    {% set t = t.split('Próximos Passos')[0] %}
-    {% set t = t.split('**Próximos passos**')[0] %}
-    {% set t = t.split('**Próximos Passos**')[0] %}
-    {% set t = t.split('## Próximos passos')[0] %}
-    {% set t = t.split('## Próximos Passos')[0] %}
-
-    {# 🔒 Remove placeholders mais comuns #}
-    {% set t = t
-        | replace('[Seu Nome]', '')
-        | replace('[Seu Contato]', '')
-        | replace('[Seu Cargo]', '')
-        | replace('[Telefone]', '')
-        | replace('[telefone]', '')
-        | replace('[E-mail]', '')
-        | replace('[e-mail]', '')
-        | replace('[Email]', '')
-        | replace('[email]', '')
-        | replace('[Nome da Empresa]', '')
-        | replace('[nome da empresa]', '')
-    %}
-
-    {# ✅ NÃO força encerramento aqui (assinatura é controlada no backend) #}
-    {% set t = t.strip() %}
+    {# Template não faz pós-processamento: backend é a fonte de verdade #}
+    {% set t = (proposal.proposal_text or "").strip() %}
 
     <textarea id="proposal_text" rows="18" readonly>{{ t }}</textarea>
 
