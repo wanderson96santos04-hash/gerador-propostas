@@ -17,6 +17,8 @@ NEXT_STEPS_BLOCK = (
 def _normalize(text: str) -> str:
     t = (text or "")
     t = t.replace("\r\n", "\n").replace("\r", "\n").replace("\u00a0", " ")
+    # remove caracteres invisíveis comuns que quebram regex/“início de linha”
+    t = t.replace("\ufeff", "").replace("\u200b", "").replace("\u200c", "").replace("\u200d", "").replace("\u2060", "")
     return t
 
 

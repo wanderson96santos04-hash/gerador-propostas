@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import re
 import logging
 from datetime import datetime
 
@@ -14,7 +13,11 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.db.models import Proposal
 from app.auth.routes import get_current_user  # vamos usar direto (mais seguro)
-from app.services.proposal_generator import generate_proposal_text
+from app.services.proposal_generator import (
+    generate_proposal_text,
+    apply_next_steps,
+    sanitize_proposal_text,
+)
 from app.pdf.render_pdf import build_proposal_pdf
 
 # presets 1-clique
@@ -22,7 +25,6 @@ from app.templates.intelligent_presets import PRESETS
 
 router = APIRouter()
 
-FINAL_SIGNATURE = "Atenciosamente,\nEquipe Comercial"
 logger = logging.getLogger(__name__)
 
 # ===== marcador simples para provar origem da geração =====
@@ -68,104 +70,15 @@ def _require_paid_or_redirect(request: Request, db: Session):
     return user, None
 
 
-def _sanitize_proposal_text(text: str) -> str:
+def _finalize_proposal_text(text: str) -> str:
     """
-    Sanitização final:
-    - remove [ ... ]
-    - remove tudo após "Próximos passos" (se existir)
-    - remove QUALQUER assinatura / despedida no final
-    - garante assinatura final fixa (UMA VEZ)
+    Fonte de verdade do fechamento:
+    - Sanitiza sem assinatura
+    - Força final padrão com "Próximos passos" (3 bullets)
+    - NÃO adiciona assinatura
     """
-    if not text:
-        return FINAL_SIGNATURE
-
-    t = (text or "")
-    t = t.replace("\r\n", "\n").replace("\r", "\n").replace("\u00a0", " ").strip()
-
-    # remove colchetes
-    t = re.sub(r"\[.*?\]", "", t, flags=re.DOTALL).strip()
-
-    # remove tudo após "próximos passos" (se GPT inventar algo depois)
-    t = re.split(
-        r"(?is)(\*\*próximos passos\*\*|##\s*próximos passos|próximos passos)",
-        t,
-        maxsplit=1,
-    )[0].strip()
-
-    # normalização
-    def _norm(s: str) -> str:
-        s = (s or "").replace("\u00a0", " ").strip().lower()
-        s = re.sub(r"\s+", " ", s)
-        return s
-
-    lines = t.split("\n")
-
-    def _pop_blank_end():
-        while lines and _norm(lines[-1]) == "":
-            lines.pop()
-
-    # captura variações comuns de assinatura / despedida
-    def _is_atenciosamente(line: str) -> bool:
-        return re.fullmatch(r"atenciosamente\s*[,:\-]?", _norm(line)) is not None
-
-    def _is_equipe(line: str) -> bool:
-        return re.fullmatch(r"equipe comercial\.?", _norm(line)) is not None
-
-    def _is_both(line: str) -> bool:
-        return re.fullmatch(
-            r"atenciosamente\s*[,:\-]?\s*equipe comercial\.?",
-            _norm(line),
-        ) is not None
-
-    # remove também "cordialmente", "att", etc, se vier no final
-    def _is_generic_closing(line: str) -> bool:
-        return _norm(line) in {
-            "cordialmente",
-            "att",
-            "atts",
-            "at.",
-            "att.",
-            "grato",
-            "grata",
-            "obrigado",
-            "obrigada",
-        }
-
-    _pop_blank_end()
-
-    # remove tudo que pareça assinatura no final (em loop, porque pode vir repetido)
-    while True:
-        _pop_blank_end()
-        if not lines:
-            break
-
-        last = lines[-1]
-
-        if _is_both(last) or _is_generic_closing(last):
-            lines.pop()
-            continue
-
-        if _is_equipe(last):
-            lines.pop()
-            _pop_blank_end()
-            if lines and _is_atenciosamente(lines[-1]):
-                lines.pop()
-            continue
-
-        if _is_atenciosamente(last):
-            lines.pop()
-            continue
-
-        break
-
-    t = "\n".join(lines).strip()
-    t = re.sub(r"\n{3,}", "\n\n", t).strip()
-
-    if not t:
-        return FINAL_SIGNATURE
-
-    # backend sempre coloca UMA assinatura fixa
-    return f"{t}\n\n{FINAL_SIGNATURE}".strip()
+    base = sanitize_proposal_text(text)
+    return apply_next_steps(base)
 
 
 def _build_input_summary(data: dict) -> str:
@@ -372,8 +285,8 @@ def create_action(
         logger.warning("GPT OFF ⚠️ Caindo no gerador padrão (fallback).")
         text = generate_proposal_text(data)
 
-    # sanitização final (inclui assinatura fixa UMA VEZ)
-    text = _sanitize_proposal_text(text)
+    # FINAL: padroniza fechamento e remove assinatura (fonte de verdade no backend)
+    text = _finalize_proposal_text(text)
 
     p = Proposal(
         user_id=user.id,

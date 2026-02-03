@@ -2,8 +2,79 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List
+import re
 
 from app.templates.proposal_catalog import TEMPLATES, PROPOSAL_BLOCKS, SALES_COPY
+
+
+NEXT_STEPS_BLOCK = (
+    "Próximos passos\n"
+    "- Aprovação desta proposta\n"
+    "- Confirmação das condições comerciais\n"
+    "- Agendamento da reunião inicial"
+)
+
+
+def _normalize(text: str) -> str:
+    t = (text or "")
+    t = t.replace("\r\n", "\n").replace("\r", "\n").replace("\u00a0", " ")
+    return t
+
+
+def _sanitize_no_signature(text: str) -> str:
+    """
+    Sanitização mínima:
+    - remove assinatura/fechamento (Atenciosamente/Cordialmente/Att.) se aparecer
+    - NÃO adiciona assinatura
+    """
+    if not text:
+        return ""
+
+    t = _normalize(text).strip()
+
+    sig_pattern = re.compile(
+        r"(?is)(?:^|\n)\s*(atenciosamente|cordialmente|assinado|att\.?)\b.*$",
+        re.MULTILINE,
+    )
+    t = re.sub(sig_pattern, "", t).strip()
+
+    t = t.rstrip(" \n\r-—•")
+    t = re.sub(r"\n{3,}", "\n\n", t).strip()
+    return t
+
+
+def _remove_next_steps_and_below(text: str) -> str:
+    """
+    Remove qualquer 'Próximos passos' existente e tudo que vem depois
+    (evita duplicação e garante o padrão no final).
+    """
+    if not text:
+        return ""
+
+    t = _normalize(text)
+
+    pattern = re.compile(
+        r"(?is)(?:^|\n)\s*(\d+\.\s*)?(\*\*)?(##\s*)?próximos passos(\*\*)?\s*:?.*$",
+        re.MULTILINE,
+    )
+    t = re.sub(pattern, "", t).strip()
+    return t
+
+
+def _apply_next_steps(text: str) -> str:
+    """
+    Força final padrão:
+    - remove assinatura
+    - remove qualquer Próximos passos anterior
+    - termina exatamente no bloco obrigatório
+    """
+    base = _remove_next_steps_and_below(text)
+    base = _sanitize_no_signature(base)
+
+    if not base:
+        return NEXT_STEPS_BLOCK
+
+    return f"{base}\n\n{NEXT_STEPS_BLOCK}"
 
 
 def _fmt_list(items: List[str], ctx: Dict[str, Any]) -> List[str]:
@@ -64,11 +135,12 @@ def generate_intelligent_proposal(payload: Dict[str, Any]) -> Dict[str, Any]:
     copy = SALES_COPY.get(tone, SALES_COPY["direto"])
     sales_section = {
         "tone": tone,
-        "intro": _fmt_text(copy["intro"], ctx),
-        "valor": _fmt_text(copy["valor"], ctx),
-        "proximo_passo": _fmt_text(copy["proximo_passo"], ctx),
-        "urgencia": _fmt_text(copy["urgencia"], ctx),
-        "fechamento": _fmt_text(copy["fechamento"], ctx),
+        "intro": _sanitize_no_signature(_fmt_text(copy["intro"], ctx)),
+        "valor": _sanitize_no_signature(_fmt_text(copy["valor"], ctx)),
+        "proximo_passo": _sanitize_no_signature(_fmt_text(copy["proximo_passo"], ctx)),
+        "urgencia": _sanitize_no_signature(_fmt_text(copy["urgencia"], ctx)),
+        # fechamento deve SEMPRE terminar no bloco padrão (sem assinatura)
+        "fechamento": _apply_next_steps(_fmt_text(copy["fechamento"], ctx)),
     }
 
     blocks_keys = tpl.get("recommended_blocks", [])
@@ -78,7 +150,7 @@ def generate_intelligent_proposal(payload: Dict[str, Any]) -> Dict[str, Any]:
         blocks.append({
             "key": key,
             "title": b["title"],
-            "text": _fmt_text(b["text"], ctx),
+            "text": _sanitize_no_signature(_fmt_text(b["text"], ctx)),
         })
 
     # JSON final (isso aqui você pluga no seu gerador de PDF)
