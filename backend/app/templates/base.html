@@ -97,7 +97,11 @@
         {% else %}
           <a href="/login">Entrar</a>
           <a href="/register">Criar conta</a>
-          <a class="primary" href="/create">Gerar proposta</a>
+
+          {# Remove CTA principal apenas na tela de login #}
+          {% if request.url.path != '/login' %}
+            <a class="primary" href="/create">Gerar proposta</a>
+          {% endif %}
         {% endif %}
       </nav>
     </div>
