@@ -3,11 +3,12 @@ from __future__ import annotations
 from io import BytesIO
 import logging
 from typing import Optional
+from datetime import date
 
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import Paragraph, Frame
 from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.colors import black
@@ -50,36 +51,78 @@ def build_proposal_pdf(
         normal.textColor = black
         normal.alignment = TA_LEFT
 
-        # ===== CABEÇALHO =====
+        heading = ParagraphStyle(
+            "Heading",
+            parent=normal,
+            fontName="Helvetica-Bold",
+            fontSize=12,
+            leading=16,
+            spaceBefore=8,
+            spaceAfter=6,
+        )
+
+        small = ParagraphStyle(
+            "Small",
+            parent=normal,
+            fontSize=9.5,
+            leading=13,
+            textColor=black,
+            spaceBefore=6,
+            spaceAfter=0,
+        )
+
+        # ===== CABEÇALHO (OBRIGATÓRIO) =====
         y = height - 2 * cm
 
         c.setFont("Helvetica-Bold", 18)
-        c.drawString(2 * cm, y, title)
-        y -= 1 * cm
+        c.drawString(2 * cm, y, "PROPOSTA COMERCIAL")
+        y -= 1.0 * cm
 
         c.setFont("Helvetica", 11)
-        if client_name:
-            c.drawString(2 * cm, y, f"Cliente: {client_name}")
-            y -= 0.6 * cm
 
-        if service:
-            c.drawString(2 * cm, y, f"Serviço: {service}")
-            y -= 0.6 * cm
+        # Campos obrigatórios (exibir mesmo que vazios)
+        c.drawString(2 * cm, y, f"Cliente: {client_name}")
+        y -= 0.6 * cm
 
-        # deadline é opcional (não crasha se vazio)
-        if deadline_value:
-            c.drawString(2 * cm, y, f"Prazo: {deadline_value}")
-            y -= 0.6 * cm
+        c.drawString(2 * cm, y, f"Serviço: {service}")
+        y -= 0.6 * cm
 
-        if price:
-            c.drawString(2 * cm, y, f"Investimento: {price}")
-            y -= 1.2 * cm
-        else:
-            y -= 0.6 * cm
+        c.drawString(2 * cm, y, f"Prazo: {deadline_value}")
+        y -= 0.6 * cm
 
-        # ===== CORPO =====
+        c.drawString(2 * cm, y, f"Valor: {price}")
+        y -= 0.6 * cm
+
+        data_str = date.today().strftime("%d/%m/%Y")
+        c.drawString(2 * cm, y, f"Data: {data_str}")
+        y -= 0.9 * cm
+
+        # Linha de separação (organização visual)
+        c.setLineWidth(0.7)
+        c.line(2 * cm, y, width - 2 * cm, y)
+        y -= 0.8 * cm
+
+        # ===== IDENTIFICAÇÃO DO PRESTADOR (BLOCO FIXO) =====
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(2 * cm, y, "Prestador do serviço:")
+        y -= 0.6 * cm
+
+        c.setFont("Helvetica", 11)
+        c.drawString(2 * cm, y, "Nome / Empresa: ________________________________")
+        y -= 0.6 * cm
+        c.drawString(2 * cm, y, "Telefone: _______________________________________")
+        y -= 0.6 * cm
+        c.drawString(2 * cm, y, "E-mail: _________________________________________")
+        y -= 0.9 * cm
+
+        # Linha de separação (organização visual)
+        c.setLineWidth(0.7)
+        c.line(2 * cm, y, width - 2 * cm, y)
+        y -= 0.8 * cm
+
+        # ===== CORPO (ORGANIZAÇÃO VISUAL) =====
         # Garante altura mínima do frame (evita erro se y ficar muito pequeno)
-        frame_top = max(y, 4 * cm)
+        frame_top = max(y, 6 * cm)
 
         frame = Frame(
             2 * cm,
@@ -90,13 +133,51 @@ def build_proposal_pdf(
         )
 
         paragraphs = []
-        # Se o texto vier vazio, ainda gera um parágrafo “em branco”
+
+        # Título da seção do conteúdo (sem mudar o texto, só organização)
+        paragraphs.append(Paragraph("Detalhamento da proposta", heading))
+
+        # Mantém o texto atual; só organiza em blocos menores
         lines = proposal_text.split("\n") if proposal_text else [""]
         for line in lines:
             if line.strip():
                 paragraphs.append(Paragraph(line, normal))
             else:
                 paragraphs.append(Paragraph("&nbsp;", normal))
+
+        # ===== BLOCO DE FECHAMENTO (OBRIGATÓRIO) =====
+        paragraphs.append(Paragraph("&nbsp;", normal))
+        paragraphs.append(Paragraph("Aprovação da proposta", heading))
+        paragraphs.append(
+            Paragraph(
+                "Esta proposta tem validade de 7 dias.<br/>"
+                "Ao aprovar, o cliente concorda com os termos descritos acima.",
+                normal,
+            )
+        )
+        paragraphs.append(Paragraph("&nbsp;", normal))
+        paragraphs.append(
+            Paragraph(
+                "Assinatura do prestador:<br/>_________________________",
+                normal,
+            )
+        )
+        paragraphs.append(Paragraph("&nbsp;", normal))
+        paragraphs.append(
+            Paragraph(
+                "Assinatura do cliente:<br/>_________________________",
+                normal,
+            )
+        )
+
+        # ===== FRASE FINAL DE AUTORIDADE (OBRIGATÓRIA) =====
+        paragraphs.append(Paragraph("&nbsp;", normal))
+        paragraphs.append(
+            Paragraph(
+                "Proposta elaborada com foco em clareza, profissionalismo e cumprimento de prazos.",
+                small,
+            )
+        )
 
         frame.addFromList(paragraphs, c)
 
