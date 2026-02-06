@@ -17,56 +17,36 @@ NEXT_STEPS_BLOCK = (
 def _normalize(text: str) -> str:
     t = (text or "")
     t = t.replace("\r\n", "\n").replace("\r", "\n").replace("\u00a0", " ")
-    # remove caracteres invisíveis comuns que quebram regex/“início de linha”
     t = t.replace("\ufeff", "").replace("\u200b", "").replace("\u200c", "").replace("\u200d", "").replace("\u2060", "")
     return t
 
 
 def sanitize_proposal_text(text: str) -> str:
-    """
-    Sanitização SEM assinatura:
-    - Remove colchetes [ ... ]
-    - Remove assinaturas (Atenciosamente/Cordialmente etc.) caso apareçam
-    - NÃO corta o texto antes de "Próximos passos" (isso é tratado fora)
-    - NÃO adiciona assinatura
-    """
     if not text:
         return ""
 
     t = _normalize(text).strip()
 
-    # remove colchetes / placeholders
     t = re.sub(r"\[.*?\]", "", t, flags=re.DOTALL).strip()
 
-    # remove qualquer bloco de assinatura se aparecer (do marcador até o fim)
-    # Aceita assinatura no início de uma linha OU no início do texto
     sig_pattern = re.compile(
         r"(?is)(?:^|\n)\s*(atenciosamente|cordialmente|assinado|att\.?)\b.*$",
         re.MULTILINE,
     )
     t = re.sub(sig_pattern, "", t).strip()
 
-    # limpa pontas comuns
     t = t.rstrip(" \n\r-—•")
-
-    # limpa quebras duplicadas
     t = re.sub(r"\n{3,}", "\n\n", t).strip()
 
     return t
 
 
 def remove_next_steps_and_below(text: str) -> str:
-    """
-    Remove qualquer 'Próximos passos' existente e tudo que vem depois,
-    pra evitar duplicar ou ficar '9.' solto no final.
-    """
     if not text:
         return ""
 
     t = _normalize(text)
 
-    # pega "Próximos passos" com variações (com numeração, markdown, etc.)
-    # e remove tudo dali pra baixo (aceita início de linha OU início do texto)
     pattern = re.compile(
         r"(?is)(?:^|\n)\s*(\d+\.\s*)?(\*\*)?(##\s*)?próximos passos(\*\*)?\s*:?.*$",
         re.MULTILINE,
@@ -129,32 +109,19 @@ def apply_value_framing(text: str, price: str, objective: str) -> str:
     if not price:
         return text
 
-    frames = {
-        "alto ticket": (
-            f"O investimento de {price} reflete o nível de especialização, "
-            "estrutura técnica e responsabilidade envolvidos na execução."
-        ),
-        "fechar rápido": (
-            f"O investimento proposto ({price}) contempla uma entrega objetiva "
-            "com foco em implementação eficiente."
-        ),
-        "qualificar": (
-            f"O valor de {price} corresponde ao escopo definido e poderá ser ajustado "
-            "caso haja ampliação de demandas."
-        ),
-    }
+    frame = (
+        f"O investimento mensal de {price} está diretamente relacionado "
+        "à responsabilidade estratégica, gestão contínua e acompanhamento próximo "
+        "necessários para a execução consistente do escopo proposto."
+    )
 
-    frame = frames.get((objective or "").lower())
-    if frame and frame.lower() not in text.lower():
+    if frame.lower() not in text.lower():
         return f"{text}\n\n{frame}"
 
     return text
 
 
 def apply_smart_closing(text: str, tone: str) -> str:
-    """
-    Fechamento NEUTRO (sem assinatura).
-    """
     closings = {
         "formal": "Após a aprovação desta proposta, serão alinhados os próximos passos para início da execução.",
         "amigável": "Com a aprovação da proposta, já é possível alinhar o início do trabalho.",
@@ -170,9 +137,6 @@ def apply_smart_closing(text: str, tone: str) -> str:
 
 
 def apply_next_steps(text: str) -> str:
-    """
-    Garante o final padrão com Próximos passos (sem duplicação).
-    """
     base = remove_next_steps_and_below(text)
     base = sanitize_proposal_text(base)
 
@@ -187,8 +151,8 @@ def _stub_generate(data: Dict[str, str]) -> str:
 
     return (
         "Proposta Comercial\n\n"
-        f"Segue proposta comercial para a prestação do serviço de {service}, "
-        "contemplando escopo, prazos e condições conforme descrito a seguir."
+        f"Esta proposta foi elaborada para estruturar e profissionalizar a prestação do serviço de {service}, "
+        "com foco em clareza de escopo, previsibilidade operacional e responsabilidade sobre a entrega."
     )
 
 
@@ -201,11 +165,18 @@ def generate_proposal_text(data: Dict[str, str]) -> str:
     else:
         raw = _stub_generate(data)
 
-    # ordem correta (mantém o que já funciona)
+    # Ajuste CIRÚRGICO do objetivo (somente se aparecer a forma genérica)
+    raw = re.sub(
+        r"O objetivo é .*?\.",
+        "O objetivo deste serviço é assumir a responsabilidade estratégica e operacional da entrega, "
+        "transformando investimento em ações executáveis e resultados mensuráveis.",
+        raw,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
     raw = apply_scope_guardrails(raw, data.get("scope") or "")
     raw = apply_revision_policy(raw, data.get("tone") or "")
     raw = apply_value_framing(raw, data.get("price") or "", data.get("objective") or "")
     raw = apply_smart_closing(raw, data.get("tone") or "")
 
-    # FINAL: força Próximos passos padrão e elimina duplicações
     return apply_next_steps(raw)
