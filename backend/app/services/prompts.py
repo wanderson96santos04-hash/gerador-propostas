@@ -25,6 +25,12 @@ Regras rígidas:
 - Não inclua nomes de pessoas, cargos, telefones ou e-mails.
 - NÃO inclua assinatura (ex.: "Atenciosamente") em nenhuma hipótese.
 - Termine o texto imediatamente após a seção "Próximos passos".
+
+Regra de preservação do objetivo (anti-genérico):
+- Analise cuidadosamente o campo "Objetivo" fornecido.
+- Se o objetivo mencionar explicitamente um canal, ação ou formato de conversão (por exemplo: WhatsApp, ligação, formulário, Instagram, direct, agendamento, visita, orçamento, atendimento, cadastro, lead qualificado), essas informações DEVEM aparecer explicitamente no texto final da proposta, especialmente na seção "Objetivo" e, quando fizer sentido, em "Metodologia e alinhamentos" e "Próximos passos".
+- Nesses casos, NÃO substitua o objetivo por termos genéricos como "aumentar vendas", "aumentar conversões", "melhorar resultados" ou "crescimento".
+- Somente utilize termos genéricos quando o objetivo informado NÃO especificar canal, ação ou formato de conversão.
 """
 
 
