@@ -102,24 +102,6 @@ def build_proposal_pdf(
         c.line(2 * cm, y, width - 2 * cm, y)
         y -= 0.8 * cm
 
-        # ===== IDENTIFICAÇÃO DO PRESTADOR (BLOCO FIXO) =====
-        c.setFont("Helvetica-Bold", 11)
-        c.drawString(2 * cm, y, "Prestador do serviço:")
-        y -= 0.6 * cm
-
-        c.setFont("Helvetica", 11)
-        c.drawString(2 * cm, y, "Nome / Empresa: ________________________________")
-        y -= 0.6 * cm
-        c.drawString(2 * cm, y, "Telefone: _______________________________________")
-        y -= 0.6 * cm
-        c.drawString(2 * cm, y, "E-mail: _________________________________________")
-        y -= 0.9 * cm
-
-        # Linha de separação (organização visual)
-        c.setLineWidth(0.7)
-        c.line(2 * cm, y, width - 2 * cm, y)
-        y -= 0.8 * cm
-
         # ===== CORPO (ORGANIZAÇÃO VISUAL) =====
         # Garante altura mínima do frame (evita erro se y ficar muito pequeno)
         frame_top = max(y, 6 * cm)
