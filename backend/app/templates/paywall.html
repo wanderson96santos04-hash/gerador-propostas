@@ -2,8 +2,8 @@
 {% extends "base.html" %}
 {% block content %}
 
-{# Preço com fallback seguro: se não vier do backend, mantém 29,90 #}
-{% set _price = paywall_price_brl if paywall_price_brl is defined and paywall_price_brl else "29,90" %}
+{# Preço com fallback seguro: se não vier do backend, mantém 29,00 #}
+{% set _price = paywall_price_brl if paywall_price_brl is defined and paywall_price_brl else "29,00" %}
 
 <style>
 .page-wrap{
@@ -95,10 +95,16 @@
   margin-top: 10px;
 }
 
+.hr{
+  height: 1px;
+  background: #e5e7eb;
+  margin: 14px 0;
+}
+
 .price{
   font-size: 44px;
   font-weight: 900;
-  margin: 6px 0 8px 0;
+  margin: 6px 0 6px 0;
   letter-spacing: -0.5px;
   color: #111827;
 }
@@ -183,10 +189,69 @@
   line-height: 1.5;
 }
 
-.hr{
-  height: 1px;
-  background: #e5e7eb;
-  margin: 14px 0;
+/* ===== Planos ===== */
+.plan-grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+@media (max-width: 860px){
+  .plan-grid{ grid-template-columns: 1fr; }
+}
+
+.plan{
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.plan h3{
+  margin: 0 0 6px 0;
+  font-size: 14px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.plan .tag{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  color:#111827;
+  margin-bottom: 10px;
+}
+
+.plan ul{
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.65;
+  font-size: 13px;
+  color:#111827;
+}
+
+.plan.pro{
+  border-color: #dbeafe;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.plan.pro .tag{
+  background:#eff6ff;
+  border-color:#dbeafe;
+  color:#1d4ed8;
+}
+
+.plan .price-mini{
+  margin-top: 10px;
+  font-size: 12px;
+  color:#4b5563;
 }
 </style>
 
@@ -194,9 +259,9 @@
   <div class="shell">
 
     <div class="hero">
-      <h1>Baixe sua proposta em PDF profissional agora</h1>
-      <p>Você já gerou sua proposta. Falta apenas liberar o acesso para baixar o PDF e enviar ao cliente com aparência profissional.</p>
-      <div class="status">🔒 Acesso ainda não liberado</div>
+      <h1>Ative o Pro e envie propostas que passam confiança</h1>
+      <p>Quando o cliente pede “me manda a proposta”, você não pode enviar algo com marca d’água ou sem PDF profissional. Com o Pro, você baixa o PDF pronto e mantém histórico pra reaproveitar.</p>
+      <div class="status">🔒 Seu acesso Pro ainda não está ativo</div>
     </div>
 
     {# Debug opcional: aparece só se o backend passar debug_payments=True #}
@@ -216,14 +281,45 @@
 
     <div class="grid">
 
-      <!-- Esquerda: benefícios -->
+      <!-- Esquerda: planos e benefícios -->
       <div class="box">
-        <div class="kicker">O que você libera ao pagar</div>
+        <div class="kicker">Planos</div>
+
+        <div class="plan-grid">
+
+          <div class="plan">
+            <div class="tag">🟢 Free</div>
+            <h3>Para testar (limitado)</h3>
+            <ul>
+              <li><strong>2 propostas por mês</strong></li>
+              <li><strong>Com marca d’água</strong></li>
+              <li><strong>Sem download de PDF profissional</strong></li>
+            </ul>
+            <div class="price-mini">Ideal pra conhecer — mas não para fechar com empresas exigentes.</div>
+          </div>
+
+          <div class="plan pro">
+            <div class="tag">🔵 Pro</div>
+            <h3>Para fechar com aparência profissional</h3>
+            <ul>
+              <li><strong>Propostas ilimitadas</strong></li>
+              <li><strong>PDF profissional</strong> pronto pra enviar</li>
+              <li><strong>Histórico completo</strong> pra reutilizar rápido</li>
+              <li><strong>Sem marca d’água</strong></li>
+            </ul>
+            <div class="price-mini"><strong>R$ {{ _price }}/mês</strong> • cancele quando quiser</div>
+          </div>
+
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="kicker">Por que isso importa?</div>
         <ul class="list">
-          <li><strong>PDF com “cara de empresa”</strong> pronto para enviar</li>
-          <li><strong>Texto pronto</strong> para copiar e mandar no WhatsApp/email</li>
-          <li><strong>Histórico salvo</strong> por cliente para reutilizar depois</li>
-          <li><strong>Mais rapidez</strong> para responder e passar confiança</li>
+          <li><strong>Você responde em minutos</strong> quando pedem proposta “pra hoje”</li>
+          <li><strong>Passa mais segurança</strong> com um PDF com padrão de empresa</li>
+          <li><strong>Evita retrabalho</strong> salvando histórico por cliente</li>
+          <li><strong>Ajuda na decisão</strong> com clareza de escopo, prazo e investimento</li>
         </ul>
 
         <div class="hr"></div>
@@ -234,33 +330,34 @@
         </div>
 
         <p class="muted">
-          Muitas vendas se perdem por demora ou proposta mal organizada. Com o PDF pronto, você responde rápido e transmite profissionalismo.
+          Em serviços técnicos (manutenção, instalação, obra, serviços recorrentes), quem compra quer clareza e “documento limpo”.
+          O Pro deixa sua proposta pronta pra aprovação — sem improviso.
         </p>
       </div>
 
       <!-- Direita: preço + CTA -->
       <div class="box">
-        <div class="kicker">Acesso completo</div>
+        <div class="kicker">Ativar Pro</div>
 
         <div class="price">R$ {{ _price }}</div>
         <div class="subprice">
-          Pagamento único • Sem mensalidade • Acesso imediato após a confirmação
+          Assinatura mensal • Liberação imediata após confirmação • Cancele quando quiser
         </div>
 
         <div class="badges">
           <span class="badge">🔒 Pagamento seguro</span>
-          <span class="badge">⚡ Liberação rápida</span>
+          <span class="badge">⚡ Ativação rápida</span>
           <span class="badge">📄 PDF profissional</span>
         </div>
 
         <div class="actions">
           {% if checkout_url %}
-            {# ✅ NÃO anexar user_id aqui (já vai pronto do backend). Isso evita duplicar user_id=user_id=... #}
+            {# ✅ NÃO anexar user_id aqui (já vai pronto do backend). Evita duplicar user_id=user_id=... #}
             <a class="btn-primary"
                href="{{ checkout_url }}"
                target="_blank"
                rel="noopener noreferrer">
-              📄 Liberar acesso e baixar meu PDF
+              🔵 Ativar Pro agora (R$ {{ _price }}/mês)
             </a>
           {% else %}
             <button class="btn-primary" disabled style="opacity:.6; cursor:not-allowed;">
@@ -272,7 +369,7 @@
         </div>
 
         <div class="smallnote">
-          ✅ Em poucos minutos você cria e envia uma proposta organizada que passa confiança.
+          ✅ Você continua criando propostas no Free. O Pro libera PDF profissional, histórico completo e uso ilimitado.
         </div>
       </div>
 
@@ -281,7 +378,7 @@
     <div class="box" style="margin-top: 14px;">
       <div class="kicker">Quando vale a pena?</div>
       <p style="margin:0; line-height:1.6; color:#111827; font-size:14px;">
-        Quando o cliente pede proposta “pra hoje” e você quer responder rápido, com clareza e aparência profissional — sem travar escrevendo.
+        Quando o cliente pede proposta e você precisa enviar algo “com cara de empresa” — sem marca d’água e sem perder tempo reescrevendo tudo.
       </p>
     </div>
 

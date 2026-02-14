@@ -1,7 +1,7 @@
 # backend/app/payments/kiwify.py
 from __future__ import annotations
 
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, Iterable
 import json
 
 
@@ -52,6 +52,10 @@ def _dig(d: Any, *keys: str) -> Optional[Any]:
     return cur
 
 
+def _norm(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
 def _as_email(value: Any) -> Optional[str]:
     """
     Normaliza e valida email.
@@ -65,32 +69,93 @@ def _as_email(value: Any) -> Optional[str]:
     return email
 
 
-def is_payment_approved(payload: Dict[str, Any]) -> bool:
+def _candidate_values(payload: Dict[str, Any]) -> Iterable[str]:
     """
-    Verifica se o webhook representa um pagamento aprovado.
-    Compatível com variações reais da Kiwify.
+    Coleta campos típicos que variam entre webhooks (venda única e recorrência).
+    """
+    return [
+        _norm(payload.get("status")),
+        _norm(payload.get("sale_status")),
+        _norm(payload.get("event")),
+        _norm(payload.get("type")),
+        _norm(payload.get("name")),
+        _norm(payload.get("action")),
+        _norm(_dig(payload, "order", "status")),
+        _norm(_dig(payload, "data", "status")),
+        _norm(_dig(payload, "purchase", "status")),
+        _norm(_dig(payload, "payment", "status")),
+        _norm(_dig(payload, "transaction", "status")),
+        # recorrência costuma aparecer como "subscription" / "recurring" / "renewal"
+        _norm(_dig(payload, "subscription", "status")),
+        _norm(_dig(payload, "data", "subscription_status")),
+        _norm(_dig(payload, "data", "event")),
+        _norm(_dig(payload, "data", "type")),
+    ]
+
+
+def is_payment_refunded_or_chargeback(payload: Dict[str, Any]) -> bool:
+    """
+    Detecta eventos negativos (reembolso/chargeback/cancelamento) para recorrência.
+    Não altera o fluxo atual; serve pra você usar quando for controlar acesso.
     """
     payload = _normalize_payload(payload)
     if not isinstance(payload, dict):
         return False
 
-    def norm(x: Any) -> str:
-        return str(x or "").strip().lower()
+    bad_values = {
+        "refunded",
+        "refund",
+        "chargeback",
+        "charged_back",
+        "chargedback",
+        "dispute",
+        "canceled",
+        "cancelled",
+        "cancel",
+        "voided",
+        "failed",
+        "declined",
+        "denied",
+        "reversed",
+        "reversal",
+        "expired",
+        "unpaid",
+    }
 
-    candidates = [
-        norm(payload.get("status")),
-        norm(payload.get("sale_status")),
-        norm(payload.get("event")),
-        norm(payload.get("type")),
-        norm(payload.get("name")),
-        norm(_dig(payload, "order", "status")),
-        norm(_dig(payload, "data", "status")),
-        norm(_dig(payload, "purchase", "status")),
-        norm(_dig(payload, "payment", "status")),
-        norm(_dig(payload, "transaction", "status")),
-    ]
+    for c in _candidate_values(payload):
+        if not c:
+            continue
+        if c in bad_values:
+            return True
+        if c.endswith(".refunded") or c.endswith(".chargeback") or c.endswith(".canceled") or c.endswith(".cancelled"):
+            return True
+        if c.endswith(":refunded") or c.endswith(":chargeback") or c.endswith(":canceled") or c.endswith(":cancelled"):
+            return True
+        if "chargeback" in c or "refunded" in c or "cancel" in c:
+            return True
 
-    # valores comuns vistos em webhooks/integrações
+    # alguns payloads trazem flags booleanas
+    if bool(payload.get("refunded")) or bool(payload.get("chargeback")):
+        return True
+
+    return False
+
+
+def is_payment_approved(payload: Dict[str, Any]) -> bool:
+    """
+    Verifica se o webhook representa um pagamento aprovado.
+    Compatível com variações reais da Kiwify.
+    (Mantém compatibilidade com o que já funciona e melhora para recorrência.)
+    """
+    payload = _normalize_payload(payload)
+    if not isinstance(payload, dict):
+        return False
+
+    # Se for claramente um evento negativo, não aprova.
+    if is_payment_refunded_or_chargeback(payload):
+        return False
+
+    # valores comuns vistos em webhooks/integrações (inclui recorrência)
     ok_values = {
         "approved",
         "paid",
@@ -103,13 +168,39 @@ def is_payment_approved(payload: Dict[str, Any]) -> bool:
         "confirmed",
         "paid_out",
         "paidout",
+        # recorrência (nomes comuns em integrações)
+        "subscription_paid",
+        "subscription.paid",
+        "subscription_approved",
+        "subscription.approved",
+        "recurring_payment_approved",
+        "recurring.payment_approved",
+        "renewed",
+        "subscription_renewed",
+        "subscription.renewed",
     }
 
-    # Alguns eventos vêm como "order.paid" / "sale.approved" etc.
-    for c in candidates:
+    # alguns payloads trazem flag booleana explícita
+    if payload.get("approved") is True or payload.get("paid") is True:
+        return True
+
+    for c in _candidate_values(payload):
+        if not c:
+            continue
         if c in ok_values:
             return True
-        if c.endswith(".approved") or c.endswith(".paid") or c.endswith(":approved") or c.endswith(":paid"):
+
+        # padrões "order.paid" / "sale.approved" / "subscription.paid"
+        if (
+            c.endswith(".approved")
+            or c.endswith(".paid")
+            or c.endswith(".succeeded")
+            or c.endswith(".completed")
+            or c.endswith(":approved")
+            or c.endswith(":paid")
+            or c.endswith(":succeeded")
+            or c.endswith(":completed")
+        ):
             return True
 
     return False
@@ -145,6 +236,11 @@ def extract_buyer_email(payload: Dict[str, Any]) -> Optional[str]:
         ("purchase", "customer", "email_address"),
         ("purchase", "buyer", "email"),
         ("purchase", "buyer", "email_address"),
+        # recorrência
+        ("subscription", "customer", "email"),
+        ("subscription", "customer", "email_address"),
+        ("data", "subscription", "customer", "email"),
+        ("data", "subscription", "customer", "email_address"),
         # às vezes vem direto em data
         ("data", "email"),
         ("data", "email_address"),

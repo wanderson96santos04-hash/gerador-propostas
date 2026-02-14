@@ -71,16 +71,20 @@ def build_proposal_pdf(
             spaceAfter=0,
         )
 
-        # ===== CABEÇALHO (OBRIGATÓRIO) =====
+        # ===== CABEÇALHO (mantém estrutura, melhora apresentação) =====
         y = height - 2 * cm
 
         c.setFont("Helvetica-Bold", 18)
         c.drawString(2 * cm, y, "PROPOSTA COMERCIAL")
-        y -= 1.0 * cm
+        y -= 0.9 * cm
 
         c.setFont("Helvetica", 11)
 
-        # Campos obrigatórios (exibir mesmo que vazios)
+        # Linha de apoio (copy curta e forte)
+        c.drawString(2 * cm, y, "Documento de proposta com escopo, prazo e investimento.")
+        y -= 0.8 * cm
+
+        # Campos (exibir mesmo que vazios)
         c.drawString(2 * cm, y, f"Cliente: {client_name}")
         y -= 0.6 * cm
 
@@ -90,19 +94,19 @@ def build_proposal_pdf(
         c.drawString(2 * cm, y, f"Prazo: {deadline_value}")
         y -= 0.6 * cm
 
-        c.drawString(2 * cm, y, f"Valor: {price}")
+        c.drawString(2 * cm, y, f"Investimento: {price}")
         y -= 0.6 * cm
 
         data_str = date.today().strftime("%d/%m/%Y")
         c.drawString(2 * cm, y, f"Data: {data_str}")
         y -= 0.9 * cm
 
-        # Linha de separação (organização visual)
+        # Linha de separação
         c.setLineWidth(0.7)
         c.line(2 * cm, y, width - 2 * cm, y)
         y -= 0.8 * cm
 
-        # ===== CORPO (ORGANIZAÇÃO VISUAL) =====
+        # ===== CORPO =====
         # Garante altura mínima do frame (evita erro se y ficar muito pequeno)
         frame_top = max(y, 6 * cm)
 
@@ -116,10 +120,10 @@ def build_proposal_pdf(
 
         paragraphs = []
 
-        # Título da seção do conteúdo (sem mudar o texto, só organização)
+        # Título da seção
         paragraphs.append(Paragraph("Detalhamento da proposta", heading))
 
-        # Mantém o texto atual; só organiza em blocos menores
+        # Mantém o texto atual; só organiza em blocos menores (não muda a lógica)
         lines = proposal_text.split("\n") if proposal_text else [""]
         for line in lines:
             if line.strip():
@@ -127,16 +131,26 @@ def build_proposal_pdf(
             else:
                 paragraphs.append(Paragraph("&nbsp;", normal))
 
-        # ===== BLOCO DE FECHAMENTO (OBRIGATÓRIO) =====
+        # ===== BLOCO DE FECHAMENTO (melhor copy sem mudar fluxo) =====
         paragraphs.append(Paragraph("&nbsp;", normal))
-        paragraphs.append(Paragraph("Aprovação da proposta", heading))
+        paragraphs.append(Paragraph("Condições e aprovação", heading))
         paragraphs.append(
             Paragraph(
-                "Esta proposta tem validade de 7 dias.<br/>"
-                "Ao aprovar, o cliente concorda com os termos descritos acima.",
+                "• Validade desta proposta: <strong>7 dias</strong>.<br/>"
+                "• Início do serviço mediante confirmação e alinhamento final.<br/>"
+                "• Ao aprovar, o cliente concorda com escopo, prazo e investimento descritos acima.",
                 normal,
             )
         )
+
+        paragraphs.append(Paragraph("&nbsp;", normal))
+        paragraphs.append(
+            Paragraph(
+                "<strong>Próximo passo:</strong> confirme a aprovação para iniciarmos e agendarmos o alinhamento de execução.",
+                normal,
+            )
+        )
+
         paragraphs.append(Paragraph("&nbsp;", normal))
         paragraphs.append(
             Paragraph(
@@ -152,11 +166,11 @@ def build_proposal_pdf(
             )
         )
 
-        # ===== FRASE FINAL DE AUTORIDADE (OBRIGATÓRIA) =====
+        # ===== FRASE FINAL (mais forte, curta, sem exagero) =====
         paragraphs.append(Paragraph("&nbsp;", normal))
         paragraphs.append(
             Paragraph(
-                "Proposta elaborada com foco em clareza, profissionalismo e cumprimento de prazos.",
+                "Proposta elaborada para dar clareza, reduzir dúvidas e acelerar a decisão com segurança.",
                 small,
             )
         )
@@ -170,6 +184,5 @@ def build_proposal_pdf(
         return buffer.read()
 
     except Exception:
-        # Log somente em caso de falha (útil no Render e local)
         logger.exception("Falha ao gerar PDF da proposta")
         raise
