@@ -13,8 +13,8 @@ NEXT_STEPS_BLOCK = (
     "- Agendamento da reunião inicial"
 )
 
-# ✅ Bloco de autoridade (pedido)
 AUTHORITY_BLOCK = (
+    "Autoridade\n"
     "Com experiência em criação de peças estratégicas voltadas para posicionamento e conversão, "
     "desenvolvo criativos que unem estética e resultado."
 )
@@ -60,6 +60,40 @@ def remove_next_steps_and_below(text: str) -> str:
     t = re.sub(pattern, "", t).strip()
 
     return t
+
+
+def apply_authority_block(text: str) -> str:
+    """
+    Insere um bloco curto de autoridade ANTES da seção "Diagnóstico e contexto",
+    sem alterar o restante do conteúdo.
+    - Se já existir algo parecido ("Autoridade" ou a frase), não duplica.
+    - Se não encontrar a seção de diagnóstico, não faz nada (para não quebrar textos diferentes).
+    """
+    if not text:
+        return text
+
+    t = _normalize(text)
+
+    # Evita duplicação
+    if "Autoridade" in t or "criação de peças estratégicas" in t.lower():
+        return text
+
+    # Encontra o título "Diagnóstico e contexto" (variações comuns)
+    diag_pattern = re.compile(
+        r"(?im)^(?:##\s*)?(?:\*\*)?\s*diagn[oó]stico\s+e\s+contexto\s*(?:\*\*)?\s*:?\s*$"
+    )
+
+    m = diag_pattern.search(t)
+    if not m:
+        return text
+
+    insert_at = m.start()
+
+    before = t[:insert_at].rstrip()
+    after = t[insert_at:].lstrip("\n")
+
+    # Garante espaçamento consistente
+    return f"{before}\n\n{AUTHORITY_BLOCK}\n\n{after}".strip()
 
 
 def apply_scope_guardrails(text: str, scope: str) -> str:
@@ -158,48 +192,10 @@ def _stub_generate(data: Dict[str, str]) -> str:
     return (
         "Proposta Comercial\n\n"
         f"Esta proposta foi elaborada para estruturar e profissionalizar a prestação do serviço de {service}, "
-        "com foco em clareza de escopo, previsibilidade operacional e responsabilidade sobre a entrega."
+        "com foco em clareza de escopo, previsibilidade operacional e responsabilidade sobre a entrega.\n\n"
+        "Diagnóstico e contexto\n"
+        "Este documento descreve o contexto, objetivo e entregáveis para execução do serviço."
     )
-
-
-def apply_authority_block(text: str) -> str:
-    """
-    Insere o bloco de autoridade antes do 'Diagnóstico e contexto' (ou variações),
-    sem alterar o restante do conteúdo.
-
-    Regras:
-    - Se já existir o texto do bloco, não duplica.
-    - Se encontrar o título 'Diagnóstico e contexto' (ou variações), injeta imediatamente antes.
-    - Se não encontrar, adiciona após a abertura (primeiro parágrafo) de forma segura.
-    """
-    if not text:
-        return text
-
-    if AUTHORITY_BLOCK.lower() in text.lower():
-        return text
-
-    t = _normalize(text)
-
-    # tenta achar o heading "Diagnóstico e contexto" (flexível)
-    pattern = re.compile(
-        r"(?im)^(?:\s*(?:##\s*)?)diagn[oó]stico\s+e\s+contexto\s*$"
-    )
-
-    m = pattern.search(t)
-    if m:
-        insert_at = m.start()
-        before = t[:insert_at].rstrip()
-        after = t[insert_at:].lstrip("\n")
-        return f"{before}\n\n{AUTHORITY_BLOCK}\n\n{after}"
-
-    # fallback: após o primeiro bloco (primeiro parágrafo)
-    parts = re.split(r"\n\s*\n", t, maxsplit=1)
-    if len(parts) == 2:
-        first, rest = parts[0].rstrip(), parts[1].lstrip()
-        return f"{first}\n\n{AUTHORITY_BLOCK}\n\n{rest}"
-
-    # fallback final: só append
-    return f"{t.rstrip()}\n\n{AUTHORITY_BLOCK}"
 
 
 def generate_proposal_text(data: Dict[str, str]) -> str:
@@ -211,9 +207,6 @@ def generate_proposal_text(data: Dict[str, str]) -> str:
     else:
         raw = _stub_generate(data)
 
-    # ✅ adiciona bloco de autoridade (sem mexer no resto)
-    raw = apply_authority_block(raw)
-
     # Ajuste CIRÚRGICO do objetivo (somente se aparecer a forma genérica)
     raw = re.sub(
         r"O objetivo é .*?\.",
@@ -222,6 +215,9 @@ def generate_proposal_text(data: Dict[str, str]) -> str:
         raw,
         flags=re.IGNORECASE | re.DOTALL,
     )
+
+    # Autoridade antes do diagnóstico (sem quebrar nada se não existir a seção)
+    raw = apply_authority_block(raw)
 
     raw = apply_scope_guardrails(raw, data.get("scope") or "")
     raw = apply_revision_policy(raw, data.get("tone") or "")
