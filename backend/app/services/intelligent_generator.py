@@ -14,6 +14,14 @@ NEXT_STEPS_BLOCK = (
     "- Agendamento da reunião inicial"
 )
 
+# ✅ Bloco fixo (para todos os serviços) — precisa existir no pipeline inteligente também,
+# pois o PDF está sendo alimentado por este gerador (direta ou indiretamente).
+AUTHORITY_BLOCK = (
+    "Autoridade\n"
+    "Com experiência em criação de peças estratégicas voltadas para posicionamento e conversão, "
+    "desenvolvo criativos que unem estética e resultado."
+)
+
 
 def _normalize(text: str) -> str:
     t = (text or "")
@@ -88,6 +96,117 @@ def _fmt_text(text: str, ctx: Dict[str, Any]) -> str:
     return text.format(**ctx)
 
 
+def _apply_authority_block_before_diagnosis(blocks: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """
+    ✅ Insere o bloco de Autoridade IMEDIATAMENTE antes do bloco "Diagnóstico e contexto".
+    Regras:
+    - Insere uma única vez.
+    - Só insere se existir Diagnóstico e contexto (com variações).
+    - Se não existir, não insere em lugar nenhum.
+    - Não duplica (por título OU pelo texto do bloco fixo).
+
+    Teste mental (sem framework):
+    1) Gere proposta via fluxo inteligente (template/subtype).
+    2) Gere/baixe PDF.
+    3) Confirme que no conteúdo aparece:
+       "... \n\nAutoridade\n[texto]\n\nDiagnóstico e contexto\n..."
+       e que "Autoridade" aparece apenas 1 vez.
+    4) Gere de novo (ou salve histórico/regenere) e confirme que não duplicou.
+    """
+    if not blocks:
+        return blocks
+
+    # Deduplicação segura
+    authority_text_key = _normalize(AUTHORITY_BLOCK).strip().lower()
+    for b in blocks:
+        title = (b.get("title") or "").strip().lower()
+        text = (b.get("text") or "").strip().lower()
+        if title == "autoridade":
+            return blocks
+        if authority_text_key and authority_text_key in (f"{title}\n{text}"):
+            return blocks
+        # trava extra (frase-chave) — útil caso o título venha diferente
+        if "criação de peças estratégicas" in text:
+            return blocks
+
+    # Encontra Diagnóstico e contexto (variações comuns)
+    diag_re = re.compile(r"(?i)\bdiagn[oó]stico\s*(?:e|&)\s*contexto\b")
+    diag_idx = None
+    for i, b in enumerate(blocks):
+        title = (b.get("title") or "").strip()
+        if title and diag_re.search(title):
+            diag_idx = i
+            break
+
+    if diag_idx is None:
+        return blocks  # regra: não inventar lugar
+
+    authority_block = {
+        "key": "authority_block",  # key interna; não depende do catalog
+        "title": "Autoridade",
+        "text": _sanitize_no_signature(AUTHORITY_BLOCK),
+    }
+
+    return blocks[:diag_idx] + [authority_block] + blocks[diag_idx:]
+
+
+def _build_plaintext_from_intelligent(result: Dict[str, Any]) -> str:
+    """
+    Constrói uma string única (proposal_text) a partir do JSON inteligente.
+    - NÃO muda o fluxo existente: só adiciona um campo opcional para facilitar plugar no PDF.
+    - Mantém headings simples (título em linha) e espaçamento consistente.
+    """
+    parts: List[str] = []
+
+    template_name = (result.get("template_name") or "").strip()
+    subtype = (result.get("subtype") or "").strip()
+    if template_name:
+        parts.append("Proposta Comercial")
+        parts.append("")
+        # linha curta pra contextualizar sem inventar dados
+        if subtype:
+            parts.append(f"Template: {template_name} — {subtype}")
+        else:
+            parts.append(f"Template: {template_name}")
+        parts.append("")
+
+    sales = result.get("sales_copy") or {}
+    # só inclui campos que existirem
+    for key, title in [
+        ("intro", "Introdução"),
+        ("valor", "Valor"),
+        ("proximo_passo", "Próximo passo"),
+        ("urgencia", "Urgência"),
+    ]:
+        txt = (sales.get(key) or "").strip()
+        if txt:
+            parts.append(title)
+            parts.append(txt)
+            parts.append("")
+
+    blocks = result.get("blocks") or []
+    for b in blocks:
+        title = (b.get("title") or "").strip()
+        text = (b.get("text") or "").strip()
+        if title:
+            parts.append(title)
+        if text:
+            parts.append(text)
+        parts.append("")
+
+    # fechamento já termina em NEXT_STEPS_BLOCK via _apply_next_steps
+    fechamento = (sales.get("fechamento") or "").strip()
+    if fechamento:
+        parts.append("Fechamento")
+        parts.append(fechamento)
+        parts.append("")
+
+    # normaliza quebras
+    out = "\n".join(parts).strip()
+    out = re.sub(r"\n{3,}", "\n\n", out).strip()
+    return out
+
+
 def generate_intelligent_proposal(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     payload esperado:
@@ -144,7 +263,7 @@ def generate_intelligent_proposal(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
     blocks_keys = tpl.get("recommended_blocks", [])
-    blocks = []
+    blocks: List[Dict[str, str]] = []
     for key in blocks_keys:
         b = PROPOSAL_BLOCKS[key]
         blocks.append({
@@ -153,8 +272,11 @@ def generate_intelligent_proposal(payload: Dict[str, Any]) -> Dict[str, Any]:
             "text": _sanitize_no_signature(_fmt_text(b["text"], ctx)),
         })
 
+    # ✅ Inserção do bloco de Autoridade no pipeline inteligente (antes do Diagnóstico)
+    blocks = _apply_authority_block_before_diagnosis(blocks)
+
     # JSON final (isso aqui você pluga no seu gerador de PDF)
-    return {
+    result = {
         "template_id": template_id,
         "template_name": tpl["name"],
         "subtype": subtype,
@@ -169,3 +291,8 @@ def generate_intelligent_proposal(payload: Dict[str, Any]) -> Dict[str, Any]:
             "validade_proposta_dias": ctx.get("validade_proposta_dias"),
         }
     }
+
+    # ✅ Campo opcional (não quebra nada): facilita alimentar o PDF com 1 string consistente
+    result["proposal_text"] = _build_plaintext_from_intelligent(result)
+
+    return result
