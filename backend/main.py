@@ -13,6 +13,8 @@ from starlette.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from jinja2 import select_autoescape
 
+from sqlalchemy import text  # ✅ para executar SQL no endpoint de migração
+
 from app.config import settings
 from app.db.session import engine
 from app.db.base import Base
@@ -41,6 +43,36 @@ def create_app() -> FastAPI:
 
     # Banco: cria tabelas (agora com models carregados)
     Base.metadata.create_all(bind=engine)
+
+    # ======================================================
+    # ✅ MIGRAÇÃO ONE-SHOT (Render Free não tem Shell)
+    # - Cria colunas novas no Postgres via ALTER TABLE
+    # - Protegido por MIGRATE_KEY (env var)
+    # - Rode 1x e depois REMOVA essa rota
+    # ======================================================
+    MIGRATE_KEY = (os.getenv("MIGRATE_KEY") or "").strip()
+
+    @app.get("/__migrate")
+    def run_migration(key: str):
+        # Proteção simples (suficiente para uso pontual)
+        if not MIGRATE_KEY or key != MIGRATE_KEY:
+            return {"ok": False, "error": "unauthorized"}
+
+        stmts = [
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS plan VARCHAR(20) NOT NULL DEFAULT 'free';",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_quota_used INT NOT NULL DEFAULT 0;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS quota_reset_at TIMESTAMP NULL;",
+            "UPDATE users SET plan = 'pro' WHERE is_paid = true;",
+            "CREATE INDEX IF NOT EXISTS idx_users_plan ON users(plan);",
+        ]
+
+        try:
+            with engine.begin() as conn:
+                for s in stmts:
+                    conn.execute(text(s))
+            return {"ok": True, "applied": len(stmts)}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     # Templates
     templates = Jinja2Templates(directory="app/templates")
