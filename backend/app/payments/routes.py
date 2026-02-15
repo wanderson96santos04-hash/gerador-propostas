@@ -15,7 +15,7 @@ from app.payments.kiwify import is_payment_approved, extract_buyer_email
 DEBUG_PAYMENTS = (os.getenv("DEBUG_PAYMENTS") == "1")
 
 if DEBUG_PAYMENTS:
-    print(">>> KIWIFY ROUTES.PY CARREGADO (versao NEVER400 v8 - FREE/PRO ready + SAFE ATTRS + PRODUCT MAP) <<<")
+    print(">>> KIWIFY ROUTES.PY CARREGADO (SAFE + IDP + FREE/PRO ready, sem quebrar is_paid) <<<")
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -26,9 +26,9 @@ router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 # Coloque no .env (recomendado):
 # KIWIFY_PRO_PRODUCT_ID=xxxx
 # KIWIFY_PRO_OFFER_ID=yyyy
-# KIWIFY_PRO_PLAN_ID=zzzz  (se existir no seu payload)
+# KIWIFY_PRO_PLAN_ID=zzzz
 #
-# Obs: se você ainda não sabe os IDs, deixa vazio. O código NÃO quebra.
+# Se não souber ainda, pode deixar vazio: NÃO QUEBRA.
 KIWIFY_PRO_PRODUCT_ID = (os.getenv("KIWIFY_PRO_PRODUCT_ID") or "").strip()
 KIWIFY_PRO_OFFER_ID = (os.getenv("KIWIFY_PRO_OFFER_ID") or "").strip()
 KIWIFY_PRO_PLAN_ID = (os.getenv("KIWIFY_PRO_PLAN_ID") or "").strip()
@@ -93,39 +93,32 @@ def _extract_user_id_from_payload(data: Dict[str, Any]) -> Optional[int]:
     Tenta achar o user_id dentro do payload (custom_fields/metadata),
     e também aceita s1 (muito comum na Kiwify).
     """
-
-    # 0) tracking.* (alguns webhooks colocam s1 aqui)
     tracking = data.get("tracking")
     if isinstance(tracking, dict):
         uid = _safe_int(_pick(tracking, "s1", "s2", "s3", "s4", "s5"))
         if uid is not None:
             return uid
 
-    # 1) s1 / s2 (tracking no root)
     uid = _safe_int(_pick(data, "s1", "s2", "s3", "s4", "s5"))
     if uid is not None:
         return uid
 
-    # 2) nível raiz
     uid = _safe_int(_pick(data, "user_id", "customer_id", "external_id"))
     if uid is not None:
         return uid
 
-    # 3) metadata raiz
     meta = data.get("metadata")
     if isinstance(meta, dict):
         uid = _safe_int(_pick(meta, "user_id", "customer_id", "external_id", "s1"))
         if uid is not None:
             return uid
 
-    # 4) custom_fields raiz
     cf = data.get("custom_fields")
     if isinstance(cf, dict):
         uid = _safe_int(_pick(cf, "user_id", "customer_id", "external_id", "s1"))
         if uid is not None:
             return uid
 
-    # 5) order.*
     order = data.get("order")
     if isinstance(order, dict):
         order_cf = order.get("custom_fields")
@@ -146,7 +139,6 @@ def _extract_user_id_from_payload(data: Dict[str, Any]) -> Optional[int]:
             if uid is not None:
                 return uid
 
-    # 6) buyer.*
     buyer = data.get("buyer")
     if isinstance(buyer, dict):
         buyer_cf = buyer.get("custom_fields")
@@ -175,7 +167,6 @@ def _extract_product_markers(data: Dict[str, Any]) -> Dict[str, str]:
     Extrai possíveis IDs de produto/oferta/plano do payload (varia na Kiwify).
     Retorna strings normalizadas.
     """
-    # possíveis caminhos (root / order / data / purchase etc.)
     candidates = [
         ("product_id",),
         ("offer_id",),
@@ -225,10 +216,9 @@ def _extract_product_markers(data: Dict[str, Any]) -> Dict[str, str]:
 
 def _is_pro_purchase(data: Dict[str, Any]) -> bool:
     """
-    Decide se o evento aprovado deve ativar PRO (recorrência).
-    Regra:
-    - Se você setar KIWIFY_PRO_PRODUCT_ID / OFFER_ID / PLAN_ID, bate por eles
-    - Se não setar, não arrisca (não ativa Pro “por engano”).
+    Decide se o evento aprovado deve ativar PRO.
+    Só ativa PRO se você configurar pelo menos um KIWIFY_PRO_*.
+    Se não configurar nada, retorna False (não “adivinha”).
     """
     markers = _extract_product_markers(data)
 
@@ -240,7 +230,6 @@ def _is_pro_purchase(data: Dict[str, Any]) -> bool:
             {"PRO_PRODUCT": KIWIFY_PRO_PRODUCT_ID, "PRO_OFFER": KIWIFY_PRO_OFFER_ID, "PRO_PLAN": KIWIFY_PRO_PLAN_ID},
         )
 
-    # Se não configurou nada, não tenta adivinhar
     if not (KIWIFY_PRO_PRODUCT_ID or KIWIFY_PRO_OFFER_ID or KIWIFY_PRO_PLAN_ID):
         return False
 
@@ -261,7 +250,8 @@ async def kiwify_webhook(request: Request):
     - nunca 400/500 (sempre 200)
     - valida token SEM derrubar
     - libera por user_id (payload/s1) OU fallback por email
-    - ✅ agora: diferencia FREE vs PRO (recorrência) sem quebrar is_paid atual
+    - ✅ mantém o que já funcionava: pagamento aprovado => is_paid=True
+    - ✅ se identificar PRO por ID => também marca campos PRO (se existirem)
     """
     try:
         # =========================
@@ -273,7 +263,7 @@ async def kiwify_webhook(request: Request):
             request.headers.get("x-kiwify-token")
             or request.headers.get("X-Kiwify-Token")
             or request.query_params.get("token")
-            or request.query_params.get("signature")  # ✅ aceita signature
+            or request.query_params.get("signature")
         )
 
         if expected_token:
@@ -305,7 +295,6 @@ async def kiwify_webhook(request: Request):
         data = _nested(payload)
 
         if DEBUG_PAYMENTS:
-            # cuidado: loga só quando DEBUG_PAYMENTS=1
             print("KIWIFY_WEBHOOK >>> payload_keys=", list(payload.keys())[:30], "| data_keys=", list(data.keys())[:30])
 
         # =========================
@@ -333,7 +322,7 @@ async def kiwify_webhook(request: Request):
         buyer_email = extract_buyer_email(data)
         buyer_email = buyer_email.strip().lower() if buyer_email else None
 
-        # ✅ Decide se esse pagamento ativa PRO (recorrência)
+        # PRO por ID (se configurado)
         is_pro = _is_pro_purchase(data)
 
         if DEBUG_PAYMENTS:
@@ -352,6 +341,7 @@ async def kiwify_webhook(request: Request):
         try:
             WebhookEvent = _get_webhook_event_model()
 
+            # idempotência
             if WebhookEvent is not None:
                 try:
                     already = (
@@ -396,29 +386,42 @@ async def kiwify_webhook(request: Request):
 
             changed = False
 
-            # ✅ REGRA NOVA (sem quebrar): só ativa "pago" se for PRO
-            # Se você quer manter o pagamento único antigo como PRO também,
-            # configure os IDs dele em KIWIFY_PRO_* (recomendado).
+            # ✅ MANTÉM O QUE JÁ FUNCIONAVA:
+            # pagamento aprovado => is_paid=True (independente de PRO)
+            if not getattr(user, "is_paid", False):
+                user.is_paid = True
+                changed = True
+
+            # campos comuns (se existirem)
+            if _set_attr_if_exists(user, "paid_at", datetime.utcnow()):
+                changed = True
+            if _set_attr_if_exists(user, "last_payment_at", datetime.utcnow()):
+                changed = True
+            if _set_attr_if_exists(user, "payment_provider", "kiwify"):
+                changed = True
+
+            # ✅ Se for PRO (por IDs configurados), marca PRO (sem quebrar se não existir campo)
             if is_pro:
-                if not getattr(user, "is_paid", False):
-                    user.is_paid = True
+                # liga is_pro se existir
+                if hasattr(user, "is_pro") and not getattr(user, "is_pro", False):
+                    user.is_pro = True
                     changed = True
 
-                # Se seu model tiver campos extras (não quebra se não tiver)
-                _set_attr_if_exists(user, "plan", "pro")
-                _set_attr_if_exists(user, "paid_plan", "pro")
-                _set_attr_if_exists(user, "subscription_status", "active")
-                _set_attr_if_exists(user, "paid_at", datetime.utcnow())
-                _set_attr_if_exists(user, "last_payment_at", datetime.utcnow())
-                _set_attr_if_exists(user, "payment_provider", "kiwify")
+                if _set_attr_if_exists(user, "plan", "pro"):
+                    changed = True
+                if _set_attr_if_exists(user, "paid_plan", "pro"):
+                    changed = True
+                if _set_attr_if_exists(user, "subscription_status", "active"):
+                    changed = True
 
+            # salva usuário
+            if changed:
                 db.add(user)
                 db.commit()
             else:
-                # Não ativa pago (fica Free)
                 db.rollback()
 
-            # registra evento (idempotência)
+            # registra evento
             if WebhookEvent is not None:
                 try:
                     event = WebhookEvent(
@@ -446,7 +449,7 @@ async def kiwify_webhook(request: Request):
             return {
                 "ok": True,
                 "approved": True,
-                "is_pro": is_pro,
+                "is_pro": bool(is_pro or getattr(user, "is_pro", False)),
                 "paid": bool(getattr(user, "is_paid", False)),
                 "changed": changed,
                 "email": buyer_email,
@@ -466,6 +469,5 @@ async def kiwify_webhook(request: Request):
             print("KIWIFY_WEBHOOK HEADER x-kiwify-token:", request.headers.get("x-kiwify-token"))
             print("KIWIFY_WEBHOOK BODY (primeiros 2000):", body.decode("utf-8", "ignore")[:2000])
         else:
-            # log mínimo sem vazar dados
             print("KIWIFY_WEBHOOK ERRO (debug off):", repr(e))
         return {"ok": True, "ignored": True, "debug_error": str(e)}
