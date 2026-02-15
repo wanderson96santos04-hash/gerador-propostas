@@ -17,6 +17,7 @@ from app.services.proposal_generator import (
     generate_proposal_text,
     apply_next_steps,
     sanitize_proposal_text,
+    apply_authority_before_diagnosis,  # ✅ NOVO: garante Autoridade também no fluxo OpenAI
 )
 from app.pdf.render_pdf import build_proposal_pdf
 
@@ -72,12 +73,23 @@ def _require_paid_or_redirect(request: Request, db: Session):
 
 def _finalize_proposal_text(text: str) -> str:
     """
-    Fonte de verdade do fechamento:
+    Fonte de verdade do texto final salvo + PDF:
     - Sanitiza sem assinatura
+    - ✅ Insere "Autoridade" imediatamente antes de "Diagnóstico e contexto" (se existir)
     - Força final padrão com "Próximos passos" (3 bullets)
     - NÃO adiciona assinatura
+
+    Teste mental (sem framework):
+    1) Gerar proposta com GPT ON e baixar PDF -> "Autoridade" deve aparecer antes de "Diagnóstico e contexto".
+    2) Gerar proposta com GPT OFF (fallback) e baixar PDF -> idem.
+    3) Abrir histórico e baixar o PDF novamente -> "Autoridade" não pode duplicar.
     """
     base = sanitize_proposal_text(text)
+
+    # ✅ Agora funciona para OpenAI e para fallback local
+    base = apply_authority_before_diagnosis(base)
+
+    # apply_next_steps já remove qualquer "Próximos passos" existente e padroniza o final
     return apply_next_steps(base)
 
 
@@ -285,7 +297,7 @@ def create_action(
         logger.warning("GPT OFF ⚠️ Caindo no gerador padrão (fallback).")
         text = generate_proposal_text(data)
 
-    # FINAL: padroniza fechamento e remove assinatura (fonte de verdade no backend)
+    # FINAL: padroniza fechamento, remove assinatura e garante Autoridade antes do Diagnóstico
     text = _finalize_proposal_text(text)
 
     p = Proposal(
