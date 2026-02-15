@@ -13,6 +13,12 @@ NEXT_STEPS_BLOCK = (
     "- Agendamento da reunião inicial"
 )
 
+# ✅ Bloco de autoridade (pedido)
+AUTHORITY_BLOCK = (
+    "Com experiência em criação de peças estratégicas voltadas para posicionamento e conversão, "
+    "desenvolvo criativos que unem estética e resultado."
+)
+
 
 def _normalize(text: str) -> str:
     t = (text or "")
@@ -156,6 +162,46 @@ def _stub_generate(data: Dict[str, str]) -> str:
     )
 
 
+def apply_authority_block(text: str) -> str:
+    """
+    Insere o bloco de autoridade antes do 'Diagnóstico e contexto' (ou variações),
+    sem alterar o restante do conteúdo.
+
+    Regras:
+    - Se já existir o texto do bloco, não duplica.
+    - Se encontrar o título 'Diagnóstico e contexto' (ou variações), injeta imediatamente antes.
+    - Se não encontrar, adiciona após a abertura (primeiro parágrafo) de forma segura.
+    """
+    if not text:
+        return text
+
+    if AUTHORITY_BLOCK.lower() in text.lower():
+        return text
+
+    t = _normalize(text)
+
+    # tenta achar o heading "Diagnóstico e contexto" (flexível)
+    pattern = re.compile(
+        r"(?im)^(?:\s*(?:##\s*)?)diagn[oó]stico\s+e\s+contexto\s*$"
+    )
+
+    m = pattern.search(t)
+    if m:
+        insert_at = m.start()
+        before = t[:insert_at].rstrip()
+        after = t[insert_at:].lstrip("\n")
+        return f"{before}\n\n{AUTHORITY_BLOCK}\n\n{after}"
+
+    # fallback: após o primeiro bloco (primeiro parágrafo)
+    parts = re.split(r"\n\s*\n", t, maxsplit=1)
+    if len(parts) == 2:
+        first, rest = parts[0].rstrip(), parts[1].lstrip()
+        return f"{first}\n\n{AUTHORITY_BLOCK}\n\n{rest}"
+
+    # fallback final: só append
+    return f"{t.rstrip()}\n\n{AUTHORITY_BLOCK}"
+
+
 def generate_proposal_text(data: Dict[str, str]) -> str:
     mode = (settings.ai_mode or "stub").lower()
 
@@ -164,6 +210,9 @@ def generate_proposal_text(data: Dict[str, str]) -> str:
         raw = generate_with_gpt(data)
     else:
         raw = _stub_generate(data)
+
+    # ✅ adiciona bloco de autoridade (sem mexer no resto)
+    raw = apply_authority_block(raw)
 
     # Ajuste CIRÚRGICO do objetivo (somente se aparecer a forma genérica)
     raw = re.sub(
