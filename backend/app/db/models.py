@@ -40,6 +40,32 @@ class User(Base):
         index=True,
     )
 
+    # ✅ Plano de produto (não muda nada do fluxo atual: default "free")
+    # - Pro continua sendo controlado por is_paid (compatível com seu sistema atual)
+    # - Esse campo permite evoluir para Free/Pro com quota real no backend
+    plan: Mapped[str] = mapped_column(
+        String(20),
+        default="free",
+        server_default="free",  # Postgres
+        nullable=False,
+        index=True,
+    )
+
+    # ✅ Contador de uso do ciclo (para Free: 2/mês)
+    monthly_quota_used: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default="0",  # Postgres
+        nullable=False,
+    )
+
+    # ✅ Marca o início do ciclo atual (usado para reset do contador)
+    # Regra sugerida: se o mês mudou, resetar.
+    quota_reset_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
