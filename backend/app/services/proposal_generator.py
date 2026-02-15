@@ -13,6 +13,7 @@ NEXT_STEPS_BLOCK = (
     "- Agendamento da reunião inicial"
 )
 
+# ✅ Bloco fixo (para todos os serviços)
 AUTHORITY_BLOCK = (
     "Autoridade\n"
     "Com experiência em criação de peças estratégicas voltadas para posicionamento e conversão, "
@@ -62,25 +63,30 @@ def remove_next_steps_and_below(text: str) -> str:
     return t
 
 
-def apply_authority_block(text: str) -> str:
+def apply_authority_before_diagnosis(text: str) -> str:
     """
-    Insere um bloco curto de autoridade ANTES da seção "Diagnóstico e contexto",
-    sem alterar o restante do conteúdo.
-    - Se já existir algo parecido ("Autoridade" ou a frase), não duplica.
-    - Se não encontrar a seção de diagnóstico, não faz nada (para não quebrar textos diferentes).
+    ✅ Insere o bloco de Autoridade IMEDIATAMENTE antes da seção "Diagnóstico e contexto".
+    - Não duplica se já existir.
+    - Não quebra se a seção não existir (nesse caso, não faz nada).
+    - Pega variações: com "1.", com **negrito**, com "##", com acento etc.
     """
     if not text:
         return text
 
     t = _normalize(text)
 
-    # Evita duplicação
+    # Evita duplicar
     if "Autoridade" in t or "criação de peças estratégicas" in t.lower():
         return text
 
-    # Encontra o título "Diagnóstico e contexto" (variações comuns)
+    # Detecta a linha do título do diagnóstico
+    # Exemplos que pega:
+    # "1. Diagnóstico e contexto"
+    # "Diagnóstico e contexto"
+    # "**Diagnóstico e contexto**"
+    # "## Diagnóstico e contexto"
     diag_pattern = re.compile(
-        r"(?im)^(?:##\s*)?(?:\*\*)?\s*diagn[oó]stico\s+e\s+contexto\s*(?:\*\*)?\s*:?\s*$"
+        r"(?im)^(?:\s*(?:\d+\.)?\s*)?(?:##\s*)?(?:\*\*)?\s*diagn[oó]stico\s+e\s+contexto\s*(?:\*\*)?\s*:?\s*$"
     )
 
     m = diag_pattern.search(t)
@@ -88,11 +94,9 @@ def apply_authority_block(text: str) -> str:
         return text
 
     insert_at = m.start()
-
     before = t[:insert_at].rstrip()
     after = t[insert_at:].lstrip("\n")
 
-    # Garante espaçamento consistente
     return f"{before}\n\n{AUTHORITY_BLOCK}\n\n{after}".strip()
 
 
@@ -193,8 +197,12 @@ def _stub_generate(data: Dict[str, str]) -> str:
         "Proposta Comercial\n\n"
         f"Esta proposta foi elaborada para estruturar e profissionalizar a prestação do serviço de {service}, "
         "com foco em clareza de escopo, previsibilidade operacional e responsabilidade sobre a entrega.\n\n"
-        "Diagnóstico e contexto\n"
-        "Este documento descreve o contexto, objetivo e entregáveis para execução do serviço."
+        "1. Diagnóstico e contexto\n"
+        "Este documento descreve o contexto, objetivo e entregáveis para execução do serviço.\n\n"
+        "2. Objetivo\n"
+        "Definir o que será entregue e qual o resultado esperado.\n\n"
+        "3. Escopo por entregáveis\n"
+        "Lista de entregas previstas conforme o escopo."
     )
 
 
@@ -216,8 +224,8 @@ def generate_proposal_text(data: Dict[str, str]) -> str:
         flags=re.IGNORECASE | re.DOTALL,
     )
 
-    # Autoridade antes do diagnóstico (sem quebrar nada se não existir a seção)
-    raw = apply_authority_block(raw)
+    # ✅ Autoridade antes do diagnóstico (sem quebrar o resto)
+    raw = apply_authority_before_diagnosis(raw)
 
     raw = apply_scope_guardrails(raw, data.get("scope") or "")
     raw = apply_revision_policy(raw, data.get("tone") or "")
