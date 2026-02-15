@@ -67,20 +67,39 @@ def apply_authority_before_diagnosis(text: str) -> str:
     """
     ✅ Insere o bloco de Autoridade IMEDIATAMENTE antes da primeira linha que contenha
     "Diagnóstico e contexto" (mesmo que tenha ":" "—" texto depois etc).
-    - Não duplica se já existir.
+    - Não duplica se já existir (checando o bloco FIXO, não a palavra solta).
     - Não quebra se a seção não existir (nesse caso, não faz nada).
     - Aguenta variações: "1.", "1)", "##", "**", ":" "—" e texto no fim da linha.
+
+    Teste mental (sem framework):
+    1) Gerar uma proposta nova (modo stub e modo gpt, se existir no app).
+    2) Baixar o PDF.
+    3) Confirmar que aparece:
+       "... [qualquer conteúdo anterior] ...\n\nAutoridade\n[texto do bloco]\n\nDiagnóstico e contexto"
+       e que "Autoridade" aparece apenas 1 vez.
+    4) Gerar de novo e salvar histórico (se existir). Baixar novamente e confirmar que não duplicou.
     """
     if not text:
         return text
 
     t = _normalize(text)
 
-    # Evita duplicar (duas travas: título OU a frase-chave)
-    if "autoridade" in t.lower() or "criação de peças estratégicas" in t.lower():
+    # ✅ Deduplicação segura: só considera "já existe" se o BLOCO FIXO estiver presente,
+    # ou se houver um heading explícito "Autoridade" em uma linha (markdown/numeração comuns).
+    #
+    # Por que? Porque o GPT pode usar a palavra "autoridade" em frases genéricas
+    # ("autoridade de marca", etc). O guard antigo retornava cedo e impedia a inserção.
+    authority_block_key = _normalize(AUTHORITY_BLOCK).strip().lower()
+    if authority_block_key and authority_block_key in t.lower():
         return t
 
-    # ✅ Agora pega a linha do diagnóstico mesmo com texto depois
+    authority_heading_pattern = re.compile(
+        r"(?im)^(?:\s*(?:\d+[\.\)]\s*)?(?:##\s*)?(?:\*\*)?\s*)autoridade(?:\s*(?:\*\*)?)\s*$"
+    )
+    if authority_heading_pattern.search(t):
+        return t
+
+    # ✅ Pega a linha do diagnóstico mesmo com texto depois
     # Ex.: "1. Diagnóstico e contexto: ..." | "## Diagnóstico e contexto — ..." | "**Diagnóstico e contexto**"
     diag_line_pattern = re.compile(
         r"(?im)^[^\n]*diagn[oó]stico\s*(?:e|&)\s*contexto[^\n]*$"
