@@ -65,33 +65,30 @@ def remove_next_steps_and_below(text: str) -> str:
 
 def apply_authority_before_diagnosis(text: str) -> str:
     """
-    ✅ Insere o bloco de Autoridade IMEDIATAMENTE antes da seção "Diagnóstico e contexto".
+    ✅ Insere o bloco de Autoridade IMEDIATAMENTE antes da primeira linha que contenha
+    "Diagnóstico e contexto" (mesmo que tenha ":" "—" texto depois etc).
     - Não duplica se já existir.
     - Não quebra se a seção não existir (nesse caso, não faz nada).
-    - Pega variações: com "1.", com **negrito**, com "##", com acento etc.
+    - Aguenta variações: "1.", "1)", "##", "**", ":" "—" e texto no fim da linha.
     """
     if not text:
         return text
 
     t = _normalize(text)
 
-    # Evita duplicar
-    if "Autoridade" in t or "criação de peças estratégicas" in t.lower():
-        return text
+    # Evita duplicar (duas travas: título OU a frase-chave)
+    if "autoridade" in t.lower() or "criação de peças estratégicas" in t.lower():
+        return t
 
-    # Detecta a linha do título do diagnóstico
-    # Exemplos que pega:
-    # "1. Diagnóstico e contexto"
-    # "Diagnóstico e contexto"
-    # "**Diagnóstico e contexto**"
-    # "## Diagnóstico e contexto"
-    diag_pattern = re.compile(
-        r"(?im)^(?:\s*(?:\d+\.)?\s*)?(?:##\s*)?(?:\*\*)?\s*diagn[oó]stico\s+e\s+contexto\s*(?:\*\*)?\s*:?\s*$"
+    # ✅ Agora pega a linha do diagnóstico mesmo com texto depois
+    # Ex.: "1. Diagnóstico e contexto: ..." | "## Diagnóstico e contexto — ..." | "**Diagnóstico e contexto**"
+    diag_line_pattern = re.compile(
+        r"(?im)^[^\n]*diagn[oó]stico\s*(?:e|&)\s*contexto[^\n]*$"
     )
 
-    m = diag_pattern.search(t)
+    m = diag_line_pattern.search(t)
     if not m:
-        return text
+        return t
 
     insert_at = m.start()
     before = t[:insert_at].rstrip()
@@ -224,7 +221,7 @@ def generate_proposal_text(data: Dict[str, str]) -> str:
         flags=re.IGNORECASE | re.DOTALL,
     )
 
-    # ✅ Autoridade antes do diagnóstico (sem quebrar o resto)
+    # ✅ Autoridade antes do diagnóstico (mais robusto; não muda o resto)
     raw = apply_authority_before_diagnosis(raw)
 
     raw = apply_scope_guardrails(raw, data.get("scope") or "")
