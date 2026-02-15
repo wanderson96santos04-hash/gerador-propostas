@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import httpx
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.db.session import get_db
 from app.db.models import Proposal
@@ -17,7 +18,6 @@ from app.services.proposal_generator import (
     generate_proposal_text,
     apply_next_steps,
     sanitize_proposal_text,
-    apply_authority_before_diagnosis,  # ✅ NOVO: garante Autoridade também no fluxo OpenAI
 )
 from app.pdf.render_pdf import build_proposal_pdf
 
@@ -25,11 +25,13 @@ from app.pdf.render_pdf import build_proposal_pdf
 from app.templates.intelligent_presets import PRESETS
 
 router = APIRouter()
-
 logger = logging.getLogger(__name__)
 
 # ===== marcador simples para provar origem da geração =====
 _LAST_GEN = {"used": "unknown"}  # "openai" | "local" | "unknown"
+
+# ===== Plano Free =====
+FREE_MONTHLY_LIMIT = 2
 
 
 # ======================================================
@@ -40,8 +42,11 @@ def _redirect_login() -> RedirectResponse:
     return RedirectResponse("/login", status_code=303)
 
 
-def _redirect_paywall() -> RedirectResponse:
-    return RedirectResponse("/paywall", status_code=303)
+def _redirect_paywall(reason: str | None = None) -> RedirectResponse:
+    url = "/paywall"
+    if reason:
+        url += f"?reason={reason}"
+    return RedirectResponse(url, status_code=303)
 
 
 def _get_user_or_redirect(request: Request, db: Session):
@@ -55,41 +60,14 @@ def _get_user_or_redirect(request: Request, db: Session):
     return user, None
 
 
-def _require_paid_or_redirect(request: Request, db: Session):
-    """
-    Retorna (user, None) se estiver logado e pago.
-    Retorna (None, RedirectResponse) se não estiver logado ou não pago.
-    """
-    user, redirect = _get_user_or_redirect(request, db)
-    if redirect:
-        return None, redirect
-
-    # Se o modelo User tiver is_paid
-    if not getattr(user, "is_paid", False):
-        return None, _redirect_paywall()
-
-    return user, None
-
-
 def _finalize_proposal_text(text: str) -> str:
     """
-    Fonte de verdade do texto final salvo + PDF:
+    Fonte de verdade do fechamento:
     - Sanitiza sem assinatura
-    - ✅ Insere "Autoridade" imediatamente antes de "Diagnóstico e contexto" (se existir)
     - Força final padrão com "Próximos passos" (3 bullets)
     - NÃO adiciona assinatura
-
-    Teste mental (sem framework):
-    1) Gerar proposta com GPT ON e baixar PDF -> "Autoridade" deve aparecer antes de "Diagnóstico e contexto".
-    2) Gerar proposta com GPT OFF (fallback) e baixar PDF -> idem.
-    3) Abrir histórico e baixar o PDF novamente -> "Autoridade" não pode duplicar.
     """
     base = sanitize_proposal_text(text)
-
-    # ✅ Agora funciona para OpenAI e para fallback local
-    base = apply_authority_before_diagnosis(base)
-
-    # apply_next_steps já remove qualquer "Próximos passos" existente e padroniza o final
     return apply_next_steps(base)
 
 
@@ -206,7 +184,7 @@ def _generate_with_openai_if_available(data: dict):
         if resp.status_code >= 400:
             return None
 
-        text = (
+        text_out = (
             resp.json()
             .get("choices", [{}])[0]
             .get("message", {})
@@ -214,12 +192,143 @@ def _generate_with_openai_if_available(data: dict):
             .strip()
         )
 
-        if text:
+        if text_out:
             _LAST_GEN["used"] = "openai"
 
-        return text
+        return text_out
     except Exception:
         return None
+
+
+# ======================================================
+# Quota / Plano (DB first)
+# ======================================================
+
+def _first_day_next_month_utc(now: datetime) -> datetime:
+    # garante reset mensal simples (UTC)
+    # pega primeiro dia do mês seguinte 00:00
+    year = now.year
+    month = now.month + 1
+    if month == 13:
+        month = 1
+        year += 1
+    return datetime(year, month, 1, 0, 0, 0)
+
+
+def _fetch_user_plan_and_quota(db: Session, user_id: int) -> dict:
+    """
+    Lê do banco sem depender de atributos no model (seguro mesmo se ORM não tiver campos novos).
+    Espera colunas: plan, monthly_quota_used, quota_reset_at (criadas via /__migrate).
+    """
+    row = db.execute(
+        text(
+            """
+            SELECT
+              COALESCE(plan, 'free') AS plan,
+              COALESCE(monthly_quota_used, 0) AS monthly_quota_used,
+              quota_reset_at
+            FROM users
+            WHERE id = :uid
+            """
+        ),
+        {"uid": user_id},
+    ).mappings().first()
+
+    if not row:
+        return {"plan": "free", "monthly_quota_used": 0, "quota_reset_at": None}
+
+    return {
+        "plan": (row.get("plan") or "free").strip().lower(),
+        "monthly_quota_used": int(row.get("monthly_quota_used") or 0),
+        "quota_reset_at": row.get("quota_reset_at"),
+    }
+
+
+def _maybe_reset_monthly_quota(db: Session, user_id: int, info: dict) -> dict:
+    """
+    Se quota_reset_at estiver vazio OU já passou, reseta monthly_quota_used para 0
+    e agenda próxima virada para o 1º dia do mês seguinte (UTC).
+    """
+    now = datetime.utcnow()
+    reset_at = info.get("quota_reset_at")
+
+    needs_reset = False
+    if reset_at is None:
+        needs_reset = True
+    else:
+        try:
+            needs_reset = reset_at <= now
+        except Exception:
+            needs_reset = True
+
+    if not needs_reset:
+        return info
+
+    next_reset = _first_day_next_month_utc(now)
+
+    db.execute(
+        text(
+            """
+            UPDATE users
+            SET monthly_quota_used = 0,
+                quota_reset_at = :next_reset
+            WHERE id = :uid
+            """
+        ),
+        {"uid": user_id, "next_reset": next_reset},
+    )
+    db.commit()
+
+    info["monthly_quota_used"] = 0
+    info["quota_reset_at"] = next_reset
+    return info
+
+
+def _is_pro_user(user, plan: str) -> bool:
+    # mantém compatibilidade com is_paid já existente
+    if getattr(user, "is_paid", False):
+        return True
+    return (plan or "free").lower() == "pro"
+
+
+def _check_free_quota_or_redirect(db: Session, user, reason: str = "quota"):
+    """
+    Retorna (ok: bool, redirect: RedirectResponse|None, meta: dict)
+    """
+    info = _fetch_user_plan_and_quota(db, user.id)
+    info = _maybe_reset_monthly_quota(db, user.id, info)
+
+    plan = info["plan"]
+    used = info["monthly_quota_used"]
+
+    if _is_pro_user(user, plan):
+        return True, None, {"plan": "pro", "used": used, "limit": None}
+
+    # Free: limite real
+    if used >= FREE_MONTHLY_LIMIT:
+        return False, _redirect_paywall(reason), {"plan": "free", "used": used, "limit": FREE_MONTHLY_LIMIT}
+
+    return True, None, {"plan": "free", "used": used, "limit": FREE_MONTHLY_LIMIT}
+
+
+def _increment_free_quota(db: Session, user_id: int):
+    """
+    Incrementa uso mensal (somente para Free).
+    Não explode se já estiver em Pro.
+    """
+    db.execute(
+        text(
+            """
+            UPDATE users
+            SET monthly_quota_used = COALESCE(monthly_quota_used, 0) + 1
+            WHERE id = :uid
+              AND COALESCE(plan, 'free') = 'free'
+              AND COALESCE(is_paid, false) = false
+            """
+        ),
+        {"uid": user_id},
+    )
+    db.commit()
 
 
 # ======================================================
@@ -231,16 +340,17 @@ def home(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return _redirect_login()
-    return RedirectResponse("/create" if getattr(user, "is_paid", False) else "/paywall", status_code=303)
+    # Agora: logado vai para criar proposta (Free também pode)
+    return RedirectResponse("/create", status_code=303)
 
 
 @router.get("/create")
 def create_page(request: Request, db: Session = Depends(get_db)):
-    user, redirect = _require_paid_or_redirect(request, db)
+    user, redirect = _get_user_or_redirect(request, db)
     if redirect:
         return redirect
 
-    # IMPORTANTE: manda user e presets pro template (evita erros no Jinja e no base.html)
+    # Deixa Free acessar a página (a trava real acontece no POST /create)
     return request.app.state.templates.TemplateResponse(
         "create_proposal.html",
         {"request": request, "user": user, "presets": PRESETS},
@@ -263,9 +373,14 @@ def create_action(
     preset_id: str = Form(None),
     db: Session = Depends(get_db),
 ):
-    user, redirect = _require_paid_or_redirect(request, db)
+    user, redirect = _get_user_or_redirect(request, db)
     if redirect:
         return redirect
+
+    # ✅ Trava real (DB) para Free: 2/mês
+    ok, redir, quota_meta = _check_free_quota_or_redirect(db, user, reason="quota")
+    if not ok and redir:
+        return redir
 
     data = {
         "client_name": (client_name or "").strip(),
@@ -289,16 +404,20 @@ def create_action(
                 data[key] = (preset.get(key) or "").strip()
 
     # geração GPT / fallback
-    text = _generate_with_openai_if_available(data)
-    if text:
+    text_out = _generate_with_openai_if_available(data)
+    if text_out:
         logger.info("GPT OK ✅ Proposta gerada pelo OpenAI.")
     else:
         _LAST_GEN["used"] = "local"
         logger.warning("GPT OFF ⚠️ Caindo no gerador padrão (fallback).")
-        text = generate_proposal_text(data)
+        text_out = generate_proposal_text(data)
 
-    # FINAL: padroniza fechamento, remove assinatura e garante Autoridade antes do Diagnóstico
-    text = _finalize_proposal_text(text)
+    # FINAL: padroniza fechamento e remove assinatura (fonte de verdade no backend)
+    text_out = _finalize_proposal_text(text_out)
+
+    # ✅ Se for Free, consome 1 uso (depois de gerar com sucesso)
+    if quota_meta.get("plan") == "free":
+        _increment_free_quota(db, user.id)
 
     p = Proposal(
         user_id=user.id,
@@ -309,7 +428,7 @@ def create_action(
         tone=data["tone"],
         objective=data["objective"],
         input_summary=_build_input_summary(data),
-        proposal_text=text,
+        proposal_text=text_out,
         created_at=datetime.utcnow(),
     )
 
@@ -328,13 +447,19 @@ def create_action(
         "result.html",
         {"request": request, "user": user, "proposal": p, "created_date": created_date},
     )
+
+    # Headers úteis para debug
     resp.headers["X-Proposal-Generator"] = _LAST_GEN.get("used", "unknown")
+    resp.headers["X-Plan"] = str(quota_meta.get("plan", "unknown"))
+    resp.headers["X-Quota-Limit"] = str(quota_meta.get("limit") or "")
+    resp.headers["X-Quota-Used-Before"] = str(quota_meta.get("used") or 0)
+
     return resp
 
 
 @router.get("/history")
 def history_page(request: Request, db: Session = Depends(get_db)):
-    user, redirect = _require_paid_or_redirect(request, db)
+    user, redirect = _get_user_or_redirect(request, db)
     if redirect:
         return redirect
 
@@ -357,7 +482,7 @@ def proposal_detail(proposal_id: int, request: Request, db: Session = Depends(ge
     """
     Rota que o history.html usa no link "Abrir"
     """
-    user, redirect = _require_paid_or_redirect(request, db)
+    user, redirect = _get_user_or_redirect(request, db)
     if redirect:
         return redirect
 
@@ -385,9 +510,17 @@ def proposal_detail(proposal_id: int, request: Request, db: Session = Depends(ge
 
 @router.get("/proposal/{proposal_id}/pdf")
 def proposal_pdf(proposal_id: int, request: Request, db: Session = Depends(get_db)):
-    user, redirect = _require_paid_or_redirect(request, db)
+    """
+    Mantém a regra atual: PDF pode ficar PRO (como você já queria).
+    Se quiser liberar PDF com watermark no Free, a gente ajusta depois.
+    """
+    user, redirect = _get_user_or_redirect(request, db)
     if redirect:
         return redirect
+
+    # Se não for pago, manda pro paywall (mantém o que já funcionava)
+    if not getattr(user, "is_paid", False):
+        return _redirect_paywall("pdf")
 
     p = (
         db.query(Proposal)
